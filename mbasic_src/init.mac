@@ -394,22 +394,20 @@ auttxt:	db	13
 	db	0
 
 
-words:	dc	' Bytes Free'
+words:	dc	' Bytes free'
 	db	0
 heding:
 	db	26
-	dc	'BASIC 5.2'
+	dc	'BASIC-80 Rev. 5.21'
 	db	13
 	db	10
-
-
-
-	dc	'MAGIC Operating System'
+	dc	'[CP/M Version]'
 	db	13
 	db	10
-	dc	'    Copyright 1982 (C)'
+	dc	'Copyright 1977-1981 (C) by Microsoft'
 	db	13,10
-	db	32,32,32,32,32
+	dc	'Created: 28-Jul-81'
+	db	13,10
 	db	0
 lastwr::				;last word of system code+1
 	ds	70+300*0+200*0+30*0	;space for temp stack
