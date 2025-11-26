@@ -774,6 +774,9 @@ alptab:
 reslst:
 
 atab:
+	db	'UT'
+	db	'O' or 128
+	db	$auto
 	db	'N'
 	db	'D' or 128
 	db	$and
@@ -786,9 +789,6 @@ atab:
 	db	'S'
 	db	'C' or 128
 	db	$asc-128
-	db	'UT'
-	db	'O' or 128
-	db	$auto
 	db	0
 
 btab:
@@ -841,6 +841,9 @@ ctab:
 
 dtab:
 
+	db	'ELET'
+	db	'E' or 128
+	db	$delet
 	db	'AT'
 	db	'A' or 128
 	db	$data
@@ -862,20 +865,17 @@ dtab:
 	db	'E'
 	db	'F' or 128
 	db	$def
-	db	'ELET'
-	db	'E' or 128
-	db	$delet
 
 
 	db	0
 
 etab:
-	db	'N'
-	db	'D' or 128
-	db	$end
 	db	'LS'
 	db	'E' or 128
 	db	$else
+	db	'N'
+	db	'D' or 128
+	db	$end
 	db	'RAS'
 	db	'E' or 128
 	db	$erase
@@ -983,6 +983,15 @@ ktab:
 	db	0
 
 ltab:
+	db	'PRIN'
+	db	'T' or 128
+	db	$lprin
+	db	'LIS'
+	db	'T' or 128
+	db	$llist
+	db	'PO'
+	db	'S' or 128
+	db	$lpos-128
 	db	'E'
 	db	'T' or 128
 	db	$let
@@ -995,15 +1004,6 @@ ltab:
 	db	'SE'
 	db	'T' or 128
 	db	$lset
-	db	'PRIN'
-	db	'T' or 128
-	db	$lprin
-	db	'LIS'
-	db	'T' or 128
-	db	$llist
-	db	'PO'
-	db	'S' or 128
-	db	$lpos-128
 	db	'IS'
 	db	'T' or 128
 	db	$list
@@ -1064,15 +1064,15 @@ ntab:
 	db	0
 
 otab:
+	db	'PE'
+	db	'N' or 128
+	db	$open
 	db	'U'
 	db	'T' or 128
 	db	$out
 	db	''
 	db	'N' or 128
 	db	$on
-	db	'PE'
-	db	'N' or 128
-	db	$open
 	db	''
 	db	'R' or 128
 	db	$or
@@ -1087,15 +1087,15 @@ otab:
 	db	0
 
 ptab:
+	db	'RIN'
+	db	'T' or 128
+	db	$print
 	db	'U'
 	db	'T' or 128
 	db	$put
 	db	'OK'
 	db	'E' or 128
 	db	$poke
-	db	'RIN'
-	db	'T' or 128
-	db	$print
 	db	'O'
 	db	'S' or 128
 	db	$pos-128
@@ -1107,6 +1107,9 @@ qtab:
 	db	0
 
 rtab:
+	db	'ETUR'
+	db	'N' or 128
+	db	$retur
 	db	'EA'
 	db	'D' or 128
 	db	$read
@@ -1116,9 +1119,6 @@ rtab:
 	db	'ESTOR'
 	db	'E' or 128
 	db	$resto
-	db	'ETUR'
-	db	'N' or 128
-	db	$retur
 	db	'E'
 	db	'M' or 128
 	db	$rem
@@ -1187,6 +1187,9 @@ stab:
 	db	0
 
 ttab:
+	db	'HE'
+	db	'N' or 128
+	db	$then
 	db	'RO'
 	db	'N' or 128
 	db	$tron
@@ -1200,9 +1203,6 @@ ttab:
 	db	''
 	db	'O' or 128
 	db	$to
-	db	'HE'
-	db	'N' or 128
-	db	$then
 	db	'A'
 	db	'N' or 128
 	db	$tan-128
@@ -2380,42 +2380,38 @@ kloop:	mov	a,m			;get character from buf
 	call	islet2			;letter?
 	jc	tstnum			;not a letter, test for number
 	push	h			;save text pointer
-	lxi	b,notgos		;place to return if not funny go
-	push	b
-	cpi	'G'			;first check for "GO "
-	rnz	
-	inx	h
-	call	makupl
-	cpi	'O'
-	rnz	
-	inx	h
-	call	makupl
-	cpi	' '
-	rnz	
-	inx	h
-gskpsp:	call	makupl			;now skip any number of spaces
-	inx	h
-	cpi	' '
-	jz	gskpsp
-	cpi	'S'
-	jz	ckgosu			;looks like "GO SUB" not "GO TO"
-	cpi	'T'
-	rnz	
-	call	makupl
-	cpi	'O'
-	mvi	a,$goto			;reswrd to use if matched
-	jmp	gputrs			;merge with "GO SUB"
-ckgosu:	call	makupl
-	cpi	'U'
-	rnz	
-	inx	h
-	call	makupl
-	cpi	'B'
+	lxi	d,gostr			;point to "GO " string
+	call	gostrcm			;compare string
+	jnz	notgos			;no match
+	call	chrgtr			;skip past match, get next char
+	lxi	d,tostr			;"TO"
+	call	gostrcm
+	mvi	a,$goto
+	jz	gputrs			;matched GOTO
+	lxi	d,ubstr			;"UB"
+	call	gostrcm
+	jnz	notgos			;neither TO nor UB
 	mvi	a,$gosub
-gputrs:	rnz	
-	pop	b			;pop off the return address since matched
-	pop	b			;pop off the old text pointer
-	jmp	notfn2			;store the reserved word
+gputrs:	pop	b			;discard saved text ptr
+	jmp	notfn2			;store the token
+;
+; string compare subroutine for GO parsing
+;
+gostrcm: ldax	d			;get string char
+	ora	a			;null terminator?
+	rz				;yes, match succeeded
+	mov	c,a			;save string char
+	call	makupl			;get input char uppercase
+	cmp	c			;compare
+	rnz				;mismatch
+	inx	h			;advance input
+	inx	d			;advance string
+	jmp	gostrcm			;loop
+;
+gostr:	db	'GO ',0
+tostr:	db	'TO',0
+ubstr:	db	'UB',0
+
 notgos:	pop	h
 	call	makupl			;get back the character
 	push	h			;resave the text pointer

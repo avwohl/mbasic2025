@@ -1,170 +1,214 @@
-# MBASIC Module Link Order Analysis
+# MBASIC 5.21 Recreation from 5.22 Sources
 
-## Executive Summary
+## Correct Link Order (CONFIRMED)
 
-Building 5.21 from the 5.22 sources requires more than reordering - the reference
-binary has:
-1. **Different module link order** - modules appear in completely different sequence
-2. **Different f4.mac internal structure** - routines within f4 are rearranged
-3. **Possible module interleaving** - f4 code may be split across other modules
+```
+bintrp -> f4 -> biptrg -> biedit -> biprtu -> bio -> bimisc -> bistrs -> binlin -> fiveo -> dskcom -> dcpm -> fivdsk -> init
+```
 
-An exact byte-for-byte match would require significant source restructuring.
+Build command:
+```bash
+ul80 -o out/mbasic.com -s \
+  out/bintrp.rel out/f4.rel out/biptrg.rel out/biedit.rel \
+  out/biprtu.rel out/bio.rel out/bimisc.rel out/bistrs.rel \
+  out/binlin.rel out/fiveo.rel out/dskcom.rel out/dcpm.rel \
+  out/fivdsk.rel out/init.rel
+```
 
 ---
 
-## MAJOR FINDING: Different Module Link Order
+## Code Changes Made (5.22 -> 5.21)
 
-Pattern matching reveals the 5.21 reference has modules in a completely different
-order than our build.
+### 1. SIN Function Sign Handling (f4.mac) - DONE
 
-### Our Build Order (from symbol addresses)
-```
-0x0100: bintrp
-0x25C3: bimisc (SCRATH)
-0x28ED: biedit (ERREDT)
-0x2B0F: binlin (QINLIN)
-0x2C4A: biptrg (SCNSEM)
-0x2FED: bistrs (STRO$)
-0x3470: bio (OUTDO)
-0x365D: biprtu (PRINUS)
-0x383A: f4 (FADDH)
-0x4C56: fiveo (WHILE)
-0x5379: dskcom (SAVE)
-0x556F: fivdsk (VARECS)
-0x5AE3: dcpm (NAME)
-0x5D5B: init (INIT)
-```
+5.21 has extra code after `rc` to handle negative inputs by pushing NEG address:
 
-### Reference (5.21) Order (from pattern matching)
-```
-0x0100: bintrp (+ possibly some f4 early?)
-0x3986: biptrg (DIM)         <- much later than our 0x2C63!
-0x3CD5: biedit (ERREDT)      <- after biptrg
-0x4320: bimisc (SCRATH)      <- very late, at 0x4320!
-0x4948: bistrs (LEFT$)
-0x4B28: binlin (INLIN)       <- appears AFTER bistrs!
-0x4C58: fiveo (WHILE)
-0x539A: dskcom (SAVE)
-0x5865: dcpm (NAME)
-0x5ACD: fivdsk (VARECS)
-0x5D8C: init (INIT)
+```asm
+sin:    lda   fac
+        cpi   167o
+        rc
+        ; 5.21 adds 16 bytes here:
+        lda   faclo+2     ; load sign byte (fac-1)
+        ora   a           ; check sign
+        jp    sinpos      ; skip if positive
+        ani   7fh         ; clear sign bit
+        sta   faclo+2     ; store back
+        lxi   d,neg       ; address of neg routine
+        push  d           ; push for return
+sinpos:
+        lxi   b,176q*256+042q   ; continue normal
 ```
 
-### Key Differences
-| Module  | Our Address | Ref Address | Difference |
-|---------|-------------|-------------|------------|
-| bimisc  | 0x25C3      | 0x4320      | +7517 bytes |
-| biedit  | 0x28ED      | 0x3CD5      | +5096 bytes |
-| biptrg  | 0x2C63      | 0x3986      | +3363 bytes |
-| binlin  | 0x2B0F      | 0x4B28      | +8190 bytes |
-| bistrs  | 0x32AC      | 0x4948      | +5788 bytes |
+**Note:** Must use `faclo+2` instead of `fac-1` due to um80 bug with negative offsets on external symbols.
 
 ---
 
-## FINDING: f4.mac Internal Reorganization
+## Known Issues
 
-The source code (5.22) has f4.mac routines in a different order than the reference (5.21).
+### um80 Assembler Bug
 
-### 5.22 Source Order (our f4.mac)
-```
-FADDH -> LOG -> FMULT -> FDIV -> SIGN -> ... -> INT -> ... -> SQR -> EXP -> RND -> COS -> SIN -> TAN -> ATN -> FOUT
-```
+The um80 assembler incorrectly handles negative offsets on external symbols:
+- `fac-1` assembles to `fac+1` instead of `fac-1`
+- **Workaround:** Use `faclo+2` which equals the correct address
 
-### 5.21 Reference Order (from pattern matching)
-```
-FADDH -> ... -> FOUTO -> SQR -> EXP -> ... -> INT -> ... -> COS -> SIN -> ... -> LOG -> FMULT -> FDIV -> SIGN -> ... -> FOUT
-```
-
-### f4 Routine Position Differences
-| Routine | Our Build | Reference | Difference | Notes |
-|---------|-----------|-----------|------------|-------|
-| FADDH   | 0x383A    | 0x3832    | -8         | Close - f4 start |
-| SQR     | 0x49B6    | 0x3C12    | -3492      | Moved MUCH EARLIER |
-| COS     | 0x4B62    | 0x3FE0    | -2946      | Moved EARLIER |
-| SIN     | 0x4B68    | 0x3FE6    | -2946      | Moved EARLIER |
-| LOG     | 0x397E    | 0x42BF    | +2369      | Moved MUCH LATER |
-| FMULT   | 0x39C4    | 0x4305    | +2369      | Moved LATER |
-| FDIV    | 0x3A2A    | 0x436B    | +2369      | Moved LATER |
-| SIGN    | 0x3B00    | 0x4441    | +2369      | Moved LATER |
-| FOUT    | 0x441F    | 0x4818    | +1017      | Moved later |
+This affects all `fac-1` references in the codebase.
 
 ---
 
-## Work Completed
+## Current Build Status
 
-### f4.mac Reordering
-The f4.mac file was reordered to attempt to match 5.21's internal structure.
-Original saved as: `mbasic_src/f4.mac.orig`
+| Metric | Value |
+|--------|-------|
+| Reference size | 24320 bytes |
+| Current build (with SIN fix) | 24336 bytes |
+| Difference | +16 bytes |
+| SIN code | MATCHES (only address relocations differ) |
 
-New block order:
-1. header (lines 1-162)
-2. faddh section (basic float ops)
-3. fone_data (data tables)
-4. fouto section (moved from end)
-5. sqr, exp, polyx sections (moved from end)
-6. fixer, int, dint, umult, isub, dsub sections
-7. rnd section (moved from end)
-8. cos_sin, tan, atn sections (moved from end)
-9. ddiv section (moved)
-10. log, fmult, div10, fdiv sections (moved)
-11. sign section (moved)
-12. remaining sections (pushf_mov, fcomp, frcint, qint, dmult, findbl, fin, fout)
-13. atncon_end
-
-### Result
-After f4.mac reordering and rebuild:
-- Our build: 24320 bytes (same as reference)
-- Differing bytes: 20621 (84.8%)
-- The reordering helped move f4 routines but didn't account for the different module link order
+The 16 extra bytes come from other 5.22 code changes not yet identified.
 
 ---
 
-## Tools Created
+## Remaining Work
+
+1. **Find 16 bytes to remove** - 5.22 has ~16 bytes of code somewhere that 5.21 doesn't have
+   - Between FIN and INPRT there's ~55 extra bytes in 5.22
+   - But offset changes cancel out across the binary
+
+2. **Fix um80 external offset bug** - Either fix the assembler or change all `fac-1` to `faclo+2`
+
+---
+
+## Tools
 
 See `utils/` directory:
 - `find_symbols.py` - Find symbol patterns from one binary in another
 - `map_routine_order.py` - Map routine order in a binary
 - `compare_binaries.py` - Compare two binary files
-- `reference_symbol_map.txt` - Documented symbol mappings found
+- `reference_symbol_map.txt` - Documented symbol mappings
 
 ---
 
-## Next Steps to Match 5.21
+## Files
 
-To achieve an exact match would require:
-
-1. **Determine exact reference link order**
-   - The reference appears to link modules in order:
-     bintrp -> ??? -> biptrg -> biedit -> bimisc -> bistrs -> binlin -> fiveo -> dskcom -> dcpm -> fivdsk -> init
-   - Need to determine what comes between bintrp and biptrg (possibly part of f4?)
-
-2. **Split f4.mac if necessary**
-   - If f4 is truly interleaved with other modules, it may need to be split into multiple files
-
-3. **Identify any code differences**
-   - Some routines may have different implementations between 5.21 and 5.22
-
-4. **Alternative: Accept differences**
-   - Build a working 5.22 binary instead of exact 5.21 match
+- `mbasic_src/f4.mac` - Modified with SIN fix
+- `mbasic_src/f4.mac.orig` - Original 5.22 source
+- `com/mbasic.com` - Reference 5.21 binary (MD5: 5fc6b24ecb203287d96e9e642ee4fc3b)
+- `out/mbasic_order6.com` - Current build with SIN fix (24336 bytes)
 
 ---
 
-## Binary Comparison Statistics
+## Session Notes (2024-11-26)
 
-| Metric | Value |
-|--------|-------|
-| Our build size | 24320 bytes |
-| Reference size | 24320 bytes |
-| Differing bytes | 20621 (84.8%) |
-| bintrp size diff | ~32 bytes larger in reference |
-| INIT position | Our 0x5D5B, Ref 0x5D8C (+49) |
+### Screen Garbling Issue
+- The Edit tool output causes terminal to switch to DEC line-drawing mode
+- Solution: Use `safe_run.sh` wrapper for all Bash commands, avoid Edit tool
+- Wrapper location: `/home/wohl/mbasic2025/safe_run.sh`
+
+### KLOOP Change (bintrp.mac)
+Changed KLOOP structure from 5.22 to 5.21 style:
+- 5.22: checks quote, space, THEN end-of-line
+- 5.21: checks end-of-line FIRST, with crdone inline
+- Made crdone label point to inline code at kloop (removed duplicate)
+- **Result: No size change** - structures are equivalent in bytes
+
+### SIN Code Verification
+Both reference and our build have identical SIN sign-handling structure:
+```
+Reference SIN at 0x387F:
+3A 07 0C FE 77 D8 3A 06 0C B7 F2 95 38 E6 7F 32
+06 0C 11 74 28 D5 01 22 7E ...
+
+Our build SIN at 0x3887:
+3A 07 0C FE 77 D8 3A 06 0C B7 F2 9D 38 E6 7F 32
+06 0C 11 4E 28 D5 01 22 7E ...
+```
+Only address operands differ (relocation), opcodes match.
+
+### Current Status
+- Reference: 24320 bytes
+- Our build (order8): 24336 bytes  
+- Difference: **16 bytes still unexplained**
+- SIN code structure matches - not the source of difference
+- KLOOP restructure had no effect on size
+
+### Next Steps
+- Use walk_compare.py to find where code actually diverges
+- The 16 bytes must be somewhere else in the codebase
+- Run: `safe_run.sh python3 utils/walk_compare.py`
 
 ---
 
-## Files Modified
+## Session Notes (continued)
 
-- `mbasic_src/f4.mac` - Reordered to attempt 5.21 match
-- `mbasic_src/f4.mac.orig` - Backup of original 5.22 structure
-- `out/f4.rel` - Rebuilt from reordered source
-- `out/mbasic.com` - Rebuilt binary
-- `out/mbasic.sym` - Rebuilt symbol table
+### Progress on walk_compare
+- Fixed KLOOP inline crdone
+- Fixed stuffh inline (moved from separate label)
+- Fixed LXI B,notgos -> LXI D,notgos
+- Fixed push b -> push d
+
+### Current Difference: "GO " string comparison
+At 0x0F98-0x0FBE, 5.21 has:
+- LXI D,string_ptr  ; point to "GO " string
+- CALL compare_loop ; subroutine at 0FBE
+- JNZ ...
+
+5.21 subroutine at 0FBE:
+```
+loop: LDAX D      ; get string char
+      ORA A       ; end of string?
+      RZ          ; yes, match!
+      MOV C,A     ; save char
+      CALL makupl ; uppercase input
+      CMP C       ; compare
+      RNZ         ; no match
+      INX H       ; next input
+      INX D       ; next string
+      JMP loop
+```
+String "GO " at 0FCC: 47 4F 20 00
+
+5.22 has inline: CPI 'G'; RNZ; INX H; CALL makupl; CPI 'O'; RNZ; ...
+
+**This is likely the source of the 16-byte difference** - 5.22 inline code vs 5.21 loop+string.
+
+### Next Step
+Add the string comparison subroutine and replace inline CPI code with CALL to it.
+
+### GO/GOTO/GOSUB Structure (Complex)
+
+5.21 at 0x0F97-0FD6 (63 bytes total):
+```
+PUSH H
+LXI D,gostr      ; "GO "
+CALL strcm       ; string compare loop at 0FBE
+JNZ notgos
+CALL gskpsp      ; skip spaces (inline subroutine)
+LXI D,tostr      ; "TO"
+CALL strcm
+MVI A,$goto
+JZ gputrs
+LXI D,ubstr      ; "UB"  
+CALL strcm
+JNZ notgos
+MVI A,$gosub
+gputrs: POP B
+JMP notfn2
+
+strcm: (0FBE)     ; string compare subroutine
+  LDAX D / ORA A / RZ / MOV C,A / CALL makupl / CMP C / RNZ / INX H / INX D / JMP strcm
+
+strings: "GO " "TO" "UB" (null terminated)
+```
+
+5.22 has inline CPI code (~30+ bytes just for character checks)
+
+**Attempt to restructure failed** - adding the subroutine+strings actually increased size.
+The 5.21 savings likely come from this routine being shared elsewhere in codebase.
+
+### Files
+- out/mbasic_order10.com - 24336 bytes (closest working build)
+- Changes in order10: KLOOP crdone inline, stuffh inline, LXI D/PUSH D for notgos
+
+### State
+- Git checkout reverted bintrp.mac - need to re-apply order10 changes
+- 16-byte difference still unexplained
