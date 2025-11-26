@@ -629,7 +629,9 @@ fdiv:	call	sign			;check for division by zero
 	mvi	l,377o			;subtract the two exponents, l is a flag
 	call	muldiv			;fix up the exponents and things
 	inr	m
+	jz	0			;5.21: check overflow
 	inr	m
+	jz	0			;5.21: check overflow
 					;here we save the fac in memory so we can subtract it from the number
 					;in the registers quickly.
 	dcx	h			;point to ho
@@ -1109,8 +1111,8 @@ icomp:	mov	a,d			;are the signs the same?
 	jnz	signs			;go set up a
 	mov	a,l			;compare the lo'S
 	sub	e
-	jnz	signs			;go set up a
-	ret				;all done, they are the same
+	rz				;5.21: return if same
+	jmp	signs			;go set up a
 
 
 					;compare two double precision numbers
@@ -1344,7 +1346,8 @@ qinta:	dcx	d			;subtract one from c,d,e
 	ana	e			; d and e are both all ones
 	inr	a			;see if both were -1
 	rnz				;they were not, we are done
-	public	dcxbrt
+	public	dcxbrt,dcx4bd
+dcx4bd:					;5.21: same as dcxbrt
 dcxbrt:	dcx	b			;this is for bill.  c will never be zero
 					; (the msb will always be one) so "DCX	B"
 					; and "DCR	C" are functionally equivalent
@@ -1776,11 +1779,11 @@ dadd2:	cpi	71o			;are we within 56 bits?
 	pop	psw			;get shift count
 	lxi	h,arg-1			;point to the ho of arg
 	call	dshftr			;shift arg right the right number of times
-	lda	arglo-1			;transfer overflow byte
-	sta	dfaclo-1		;from arg to fac
-	mov	a,b
+	mov	a,b			;5.21: reorder
 	ora	a			;get subtraction flag
 	jp	dadd3			;subtract numbers if their signs are different
+	lda	arglo-1			;transfer overflow byte
+	sta	dfaclo-1		;from arg to fac
 	call	daddaa			;signs are the same, add the numbers
 	jnc	dround			;round the result if no carry
 	xchg				;get pointer to fac in (hl)
@@ -2056,9 +2059,7 @@ dd10:	push	psw			;save loop counter
 	dcr	a
 	jnz	dd10
 	call	$decf1
-	call	$decf1
-	call	$decf1
-	ret	
+	call	$decf1			;5.21: fall into $decf1 (no third call, no ret)
 $decf1:	lxi	h,fac
 	dcr	m			;(fac)=(fac)/2
 	rnz	
@@ -2469,9 +2470,7 @@ finedg:	mov	a,e			;exponent digit -- multiply exponent by 10
 finedo:	mvi	e,127			;an exponent like this will safely cause
 					; overflow or underflow
 	jmp	finec			;continue
-ovfin1:	ora	a			;clear carry
-	jmp	ovfint			;go print overflow
-ovfin9:	pop	psw			;get stack right
+;5.21: removed dead code ovfin1 and ovfin9
 ovfin2:	push	h			;
 	lxi	h,fac-1			;point (hl) to sign byte
 	call	getypr
@@ -2485,13 +2484,11 @@ ovf2b:
 	ral				;sign in carry
 	pop	h			;
 	jmp	ovfint
-ovf2c:	lda	fac+1			;this entry is used by consd
-	jmp	ovfi4b			;when d.p. exp too large for s.p.
-ovfin5:	pop	psw			;need to do 3 pop'S THEN OVERFLOW
+;5.21: removed dead ovfin5
 ovfin6:	pop	psw
 ovfin7:	pop	psw
 ovfin3:	lda	fac-1
-	ral	
+	ral
 	jmp	ovfint
 ovfin8:	pop	psw			;do a pop then fall into ovfin4
 ovfin4:	lda	fac+1			;get sign byte
@@ -2500,21 +2497,8 @@ ovfi4b:	ral				;sign to carry
 	jmp	ovfint
 intdv1:	mov	a,c
 	jmp	intdv2			;
-intdv0:	push	h			;get arg sign byte
-	push	d			;
-	lxi	h,dfaclo
-	lxi	d,infm			;all one'S
-	call	move
-	lda	infm			;377
-	sta	dfaclo+2		;(previously 177)
-	call	getypr
-	jpo	indv0a			;not d.p. load arg sign
-	lda	fac-1
-	jmp	indv0b
 indv0a:
 	lda	arg-1
-indv0b:	pop	d
-	pop	h
 intdv2:	ral				;to carry
 	lxi	h,divmsg		;get message address
 	shld	overri			;store so ovfint will pick up
@@ -2530,13 +2514,13 @@ ovfint:					;ansi overflow routine
 	ora	l
 	jnz	ovfprt			;jump print if trapping
 					;otherwise +infinity
-	lda	flgovc			;print indicator flag
+	lxi	h,flgovc		;5.21: uses lxi h pattern
+	mov	a,m			;print indicator flag
 	ora	a			;print if 0,1;set to 2 if 1
 	jz	ov1a			;go print
-	cpi	1
+	dcr	a			;5.21: dcr a instead of cpi 1
 	jnz	ov1b
-	mvi	a,2
-	sta	flgovc
+	inr	m			;5.21: H points to flgovc, inr m
 ov1a:
 	lhld	overri			;address of overflow message
 	call	strprn			;print
@@ -2555,7 +2539,7 @@ ovfprt:	pop	psw			;get plus,minus indication back
 	lxi	d,infm			;minus infinity
 ovfina:	call	move			;move into fac
 	call	getypr
-	jpo	ovfinb			;sp all ok
+	jc	ovfinb			;5.21: jc instead of jpo
 	lxi	h,dfaclo
 	lxi	d,infm			;all ones
 	call	move
@@ -2563,7 +2547,15 @@ ovfinb:
 	lhld	onelin			;trapping errors?
 	mov	a,h
 	ora	l
-	jz	noodtp			;jump if not trapping
+	jnz	ovftrp			;5.21: jnz to trap handler
+	pop	psw			;
+	lxi	h,ovrmsg		;put "OVRMSG" address in overri
+	shld	overri			;in case this was a div by 0
+	pop	d
+	pop	b
+	pop	h			;all restored
+	ret				;continue processing
+ovftrp:
 	lhld	overri
 	lxi	d,ovrmsg
 	call	dcompr
@@ -2571,14 +2563,6 @@ ovfinb:
 	shld	overri
 	jz	overr
 	jmp	dv0err
-noodtp:
-	pop	psw			;
-	lxi	h,ovrmsg		;put "OVRMSG" address in overri
-	shld	overri			;in case this was a div by 0
-	pop	d
-	pop	b
-	pop	h			;all restored 
-	ret				;continue processing
 infp:	db	377o
 	db	377o
 	db	177o
@@ -2587,6 +2571,17 @@ infm:	db	377o
 	db	377o
 	db	377o
 	db	377o
+intdv0:	push	h			;get arg sign byte
+	push	d			;
+	lxi	h,dfaclo
+	lxi	d,infm			;all one'S
+	call	move
+	lda	infm			;377
+	sta	dfaclo+2		;(previously 177)
+	call	getypr
+	jpo	indv0a			;not d.p. load arg sign
+	lda	fac-1
+	jmp	intdv2
 
 
 
