@@ -1,0 +1,16 @@
+Make a plan to make the following programs
+Microsoft relased the sources of thier 1980s era basic interpreter.
+See mbasic_src for the files.
+The tools to build them ran on 8080 computers.
+Make a replacement set of assembler, linker, library manger, cross ref tool
+that can run on linux.
+See the .pdf files in the docs directory for specifications of what to emulate.
+Note: only implement the data in and out to programs, not the command line parsing or
+switches.  For each of the programs use normal linux conventions for the program
+arguments.
+Write this code in .py
+For each program use its microsoft name preceded by u (for unix). For example
+the M80.COM you make would be called um80 (note: no .py in name of programs, only .py for libraries). 
+
+
+bintrp,biedit,bimisc,binlin,bio,biprtu,biptrg,bistrs,dcpm,dskcom,f4,fivdsk,fiveo,init
