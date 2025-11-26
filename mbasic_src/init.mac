@@ -397,7 +397,6 @@ auttxt:	db	13
 words:	dc	' Bytes free'
 	db	0
 heding:
-	db	26
 	dc	'BASIC-80 Rev. 5.21'
 	db	13
 	db	10
@@ -410,7 +409,7 @@ heding:
 	db	13,10
 	db	0
 lastwr::				;last word of system code+1
-	ds	70+300*0+200*0+30*0	;space for temp stack
+	ds	64	;space for temp stack
 tstack:
 					;make sure last word punched is ok
 	end	
