@@ -409,7 +409,7 @@ heding:
 	db	13,10
 	db	0
 lastwr::				;last word of system code+1
-	ds	64	;space for temp stack
+	ds	53	;space for temp stack (was 64, adjusted for 5.21)
 tstack:
 					;make sure last word punched is ok
 	end	

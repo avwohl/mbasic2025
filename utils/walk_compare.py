@@ -25,8 +25,9 @@ INST_LEN = {
 ref = open('/home/wohl/mbasic2025/com/mbasic.com', 'rb').read()
 our = open('/home/wohl/mbasic2025/out/mbasic_go.com', 'rb').read()
 
-# Start from 0x0206 (file offset 0x0106) where code begins
-START = 0x0106
+# Start from FNDFOR (0x0C50 memory = 0x0B50 file) where real code begins
+# The beginning of the file is JMP + data tables + error messages
+START = 0x0B50
 rp = START
 op = START
 inst_num = 0
@@ -51,5 +52,5 @@ while rp < len(ref) and op < len(our):
     op += r_len
     inst_num += 1
 
-print(f"Scanned {inst_num} instructions from 0x0206")
+print(f"Scanned {inst_num} instructions from 0x{START+0x100:04X}")
 print(f"Ref pos: 0x{rp+0x100:04X}, Our pos: 0x{op+0x100:04X}")

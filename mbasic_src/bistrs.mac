@@ -72,6 +72,15 @@ trurom	set	0
 ; a=377 if b,c,d,e .gt. faclo
 ; a=1 if b,c,d,e .lt. faclo
 ;
+;5.21: ptrchk - subroutine to check if disk file output active
+	extrn	ptrfil
+	public	ptrchk
+ptrchk:	push	h
+	lhld	ptrfil
+	mov	a,h
+	ora	l
+	pop	h
+	ret
 strcmp:	call	frestr			;free up the fac string, and get the
 					;pointer to the fac descriptor in [h,l]
 	mov	a,m			;save the length of the fac string in [a]

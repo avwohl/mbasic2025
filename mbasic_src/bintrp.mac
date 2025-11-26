@@ -140,7 +140,7 @@ kbflen	set	buflen+(buflen/4)	;make krunch buffer somewhat
 	extrn	finlpt
 	public	lptpos,prtflg
 	extrn	consih,vmovfa,vmovaf,isign,conia,getbcd,vsign,vdfacs
-	extrn	vmovmf,vmovfm,frcint,frcsng,frcdbl,vneg,pufout,dcxbrt,iadd
+	extrn	vmovmf,vmovfm,frcint,frcsng,frcdbl,vneg,pufout,dcxbrt,dcx4bd,iadd
 	extrn	isub,imult,icomp,ineg,dadd,dsub,dmult,ddiv,dcomp,vint
 	extrn	findbl,ineg2
 
@@ -1816,8 +1816,7 @@ fmltt2	set	fbuffr+41
 intxt:	dc	' in '
 	db	0
 reddy:
-	db	10
-	dc	'Ready'
+	dc	'Ok'
 	db	13
 	db	10
 	db	0
@@ -1850,8 +1849,8 @@ stksrc:
 	mov	b,m
 	inx	h
 	push	h			;put h  on
-	mov	l,c			;push b / xthl is slower
-	mov	h,b
+	mov	h,b			;push b / xthl is slower
+	mov	l,c
 	mov	a,d			;for the "NEXT" statment without an argument
 	ora	e			;we match on anything
 	xchg				;make sure we return [d,e]
@@ -2357,19 +2356,64 @@ crunch:	xra	a			;say expecting floating numbers
 					;minus three because of zeros at end
 	lxi	d,kbuf			;setup destination pointer
 kloop:	mov	a,m			;get character from buf
-					;setup b with a quote if it is a string
+	ora	a			;5.21: check end of line FIRST
+	jnz	kloop2			;not end, continue checking
+crdone:					;5.21: crdone code inline here
+	lxi	h,0+kbflen+2		;get offset
+	mov	a,l			;get count to subtract from
+	sub	c			;subtract
+	mov	c,a
+	mov	a,h
+	sbb	b
+	mov	b,a
+	lxi	h,kbuf-1			;get pointer to char before kbuf
+	xra	a			;get a zero
+	stax	d			;need three 0'S ON THE END
+	inx	d
+	stax	d
+	inx	d
+	stax	d
+	ret				;end of crunching
+kloop2:					;continue checking
 	cpi	34			;quote sign? 
 	jz	strng			;yes, go to special string handling
 	cpi	' '			;space?
-	jz	stuffh			;just stuff away
-	ora	a			;end of line?
-	jz	crdone			;yes, done crunching
+	jz	kstuff			;5.21: space goes to inline stuff
 	lda	dores			;in data statement and no crunch?
 	ora	a
 	mov	a,m			;get the character again
-	jnz	stuffh			;if no crunching just store
-					;the character
-	cpi	'?'			;a qmark?
+	jz	kcont			;5.21: if NOT in DATA, continue crunching
+					;fall through when IN DATA statement
+kstuff:	inx	h			;advance text pointer
+	push	psw			;save character
+	call	krnsav			;store char in krunch buffer
+	pop	psw			;restore character
+	sui	':'			;was it colon?
+	jz	ksetfl			;yes, go clear DATA flags
+	cpi	$data-':'		;check for DATA token
+	jnz	kchknd			;no
+	mvi	a,1			;set DATA flag value
+ksetfl:	sta	dores			;store to dores
+	sta	donum			;store to donum
+kchknd:	sui	$rem-':'			;check for REM token
+	jnz	kloop			;not REM, loop back
+	push	psw			;5.21: push terminator (0) for REM string
+str1:	mov	a,m			;get a char
+	ora	a			;set condition codes
+	xthl				;get saved terminator off stack, save [h,l]
+	mov	a,h			;get terminator into [a] without affecting psw
+	pop	h			;restore [h,l]
+	jz	crdone			;if end of line then done
+	cmp	m			;compare char with this terminator
+	jz	kstuff			;5.21: string done goes to kstuff
+strng:
+	push	psw			;save terminator
+	mov	a,m			;get back line char
+strng2:	inx	h			;increment text pointer
+	call	krnsav			;save char in krunch buffer
+	jmp	str1			;keep looping
+
+kcont:	cpi	'?'			;a qmark?
 	mvi	a,$print
 	push	d			;save store pointer
 	push	b			;save char count
@@ -2480,43 +2524,35 @@ lopsk2:	ldax	d			;get a byte from reswrd list
 	jmp	tryaga			;try another reswrd
 
 notfnt:	dcx	h			;fix text pointer
-notfn2:	push	psw			;save char to be save d in krunch buffer
-	lxi	b,notrs2		;where to go if not line number reswrd
-	push	b			;save label address on stack
-	cpi	$resto			;restore can have following line number
-	rz	
-	cpi	$auto			;auto command
-	rz				;scan line range &crunch
-	cpi	$renum			;renumber?
-	rz	
-	cpi	$delet			;delete?
-	rz				;if so, crunch following line #
-	cpi	$edit			;edit?
-	rz	
-	cpi	$resum			;resume?
-	rz				;crunch following line number
-	cpi	$erl			;error line
-	rz				;crunch following line number
-					;so that if "ERL=...THEN"
-					;will resequence properly
-					;this can make statements like 
-					;"PRINT ERL,1E20" do strange things
-	cpi	$else
-	rz				;if else, crunch following line #
-	cpi	$run			;run?
-	rz				;crunch following line #
-	cpi	$list			;list?
-	rz	
-	cpi	$llist			;lpt list?
-	rz				;crunch following line #'S
-	cpi	$goto			;if goto, crunch line #
-	rz	
-	cpi	$then			;crunch line #'S AFTER 'then'
-	rz	
-	cpi	$gosub			;if gosub, crunch line #'S
-	rz	
-	pop	psw			;get rid of notrs2 return address
-	xra	a			;get a zero (expect usuall numbers)
+notfn2:	push	psw			;5.21: save char to be saved in krunch buffer
+	lxi	d,lntktb		;5.21: point to line number token table
+	mov	c,a			;5.21: save token in C
+lntkl:	ldax	d			;5.21: get table byte
+	ora	a			;5.21: end of table?
+	jz	lntknd			;5.21: yes, not found
+	inx	d			;5.21: next table entry
+	cmp	c			;5.21: match?
+	jnz	lntkl			;5.21: no, keep looking
+	jmp	notrs2			;5.21: found, go to line# handler
+;
+; 5.21 line number token table
+;
+lntktb:	db	$resto			;restore
+	db	$auto			;auto
+	db	$renum			;renum
+	db	$delet			;delete
+	db	$edit			;edit
+	db	$resum			;resume
+	db	$erl			;erl
+	db	$else			;else
+	db	$run			;run
+	db	$list			;list
+	db	$llist			;llist
+	db	$goto			;goto
+	db	$then			;then
+	db	$gosub			;gosub
+	db	0			;end of table
+lntknd:	xra	a			;5.21: get a zero (not found, line#s NOT allowed)
 	db	302q			;"JNZ" over next two bytes
 notrs2:	mvi	a,1			;say line #'S ALLOWED.
 notrs6:	sta	donum			;save in flag
@@ -2528,6 +2564,10 @@ notrs6:	sta	donum			;save in flag
 	push	psw			;save current char ($else)
 	cz	krnsvc			;save ":" in crunch buffer
 	pop	psw			;get back token
+	cpi	$while			;5.21: check for WHILE token
+	jnz	cksngq			;not WHILE, skip to sngqtk check
+	call	krnsvc			;WHILE found, save ":"
+	mvi	a,plustk		;5.21: set to non-sngqtk value
 cksngq:	cpi	sngqtk			;single quoatation mark?
 	jnz	ntsngt
 	push	psw			;save sngqtk
@@ -2549,10 +2589,10 @@ numtry:	lda	donum			;test for numbers allowed
 	mov	a,m			;get char if going to stuffh
 	pop	b			;restore char count
 	pop	d			;restore dep. pointer
-	jm	stuffh			;no, just stuff it (!)
+	jm	kstuff			;5.21: no, just stuff it (!)
 	jz	fltget			;if donum=0 then floating #'S ALLOWED
 	cpi	'.'			;is it dot?
-	jz	stuffh			;yes, stuff it for heavens sake! (edit .)
+	jz	kstuff			;5.21: stuff it (edit .)
 	mvi	a,lincon		;get line # token
 	call	krnsav			;save it
 	push	d			;save deposit pointer
@@ -2622,7 +2662,7 @@ srcsp2:	inx	d			;move pointer ahead
 
 ntsngt:
 	cpi	'&'			;octal constant?
-	jnz	stuffh			;just stuff it away
+	jnz	kstuff			;5.21: just stuff it away
 	push	h			;save text pointer
 	call	chrgtr			;get next char
 	pop	h			;restore text pointer
@@ -2637,56 +2677,6 @@ wuzoct:	call	krnsav			;save it
 	call	octcns			;get the value
 	pop	b			;restore [b,c]
 	jmp	savint			;save the integer in the krunch buffer
-stuffh:	inx	h			;entry to bump [h,l]
-	push	psw			;save char as krnsav clobbers
-	call	krnsav			;save char in krunch buffer
-	pop	psw			;restore char
-	sui	':'			;see if it is a colon
-	jz	colis			;if so allow crunching again
-	cpi	$data-':'
-	jnz	nodatt			;see if it is a data token
-	mvi	a,1			;set line number allowed flag
-					;kludge as has to be non-zero.
-colis:	sta	dores			;setup flag
-	sta	donum			;set number allowed flag
-nodatt:	sui	$rem-':'
-	jnz	kloop			;keep looping
-	push	psw			;save terminator on stack
-str1:	mov	a,m			;get a char
-	ora	a			;set condition codes
-	xthl				;get saved terminator off stack, save [h,l]
-	mov	a,h			;get terminator into [a] without affecting psw
-	pop	h			;restore [h,l]
-	jz	crdone			;if end of line then done
-	cmp	m			;compare char with this terminator
-	jz	stuffh			;if yes, done with string
-strng:
-	push	psw			;save terminator
-	mov	a,m			;get back line char
-strng2:	inx	h			;increment text pointer
-	call	krnsav			;save char in krunch buffer
-	jmp	str1			;keep looping
-
-crdone:
-
-					;add 5 to line count & for in [b,c]
-	lxi	h,0+kbflen+2		;get offset
-	mov	a,l			;get count to subtract from
-	sub	c			;subtract
-	mov	c,a
-	mov	a,h
-	sbb	b
-	mov	b,a
-	lxi	h,kbuf-1		;get pointer to char before kbuf
-					;as "GONE" does a chrget
-	xra	a			;get a zero
-	stax	d			;need three 0'S ON THE END
-	inx	d			;one for end-of-line
-	stax	d			;and 2 for a zero link
-	inx	d			;since if this is a direct statement
-	stax	d			;its end must look like the end of a program
-	ret				;end of crunching
-
 krnsvc:	mvi	a,':'			;get colon
 krnsav:
 					;in krunch buffer
@@ -2797,9 +2787,8 @@ for:	mvi	a,100
 	shld	endfor			;save for comparison
 	lxi	h,0+2			;set up pointer into stack
 	dad	sp
-lpform:	call	looper			;must have variable pointer in [d,e]
-	pop	d			;[d,e]=text pointer
-	jnz	notol			;if no matching entry, don'T
+lpform:	call	looper			;5.21: must have variable pointer in [d,e]
+	jnz	notol			;5.21: if no matching entry, don't
 					;eliminate anything
 	dad	b			;in the case of "FOR"
 					;we eliminate the matching entry
@@ -2815,11 +2804,13 @@ lpform:	call	looper			;must have variable pointer in [d,e]
 	lhld	endfor			;get ending text pointer for this "FOR"
 	call	dcompr			;see if they match
 	pop	h			;get back the stack pointer
+	pop	d			;5.21: get text pointer before jnz
 	jnz	lpform			;keep searching if no match
 	pop	d			;get back the text pointer
 	sphl				;do the elimination
 	shld	savstk			;update saved stack
 					;since a matching entry was found
+	mvi	c,0D1h			;5.21: constant before notol
 notol:	xchg				;[h,l]=text pointer
 	mvi	c,8			;make sure 16 bytes are available
 					;off of the stack
@@ -3025,9 +3016,7 @@ chrcon:	cpi	' '			;must skip spaces
 	ret				;all done
 
 ntrscc:	cpi	concn2			;going to scan past embedded constant?
-	jnz	ntrsc2			;no, try other cases
-conscn:	lhld	contxt			;get saved text pointer
-	jmp	chrgt2			;and scan thing after constant
+	jz	conscn			;5.21: yes, jump forward to conscn
 ntrsc2:	push	psw			;save token to return
 	inx	h			;point to number
 	sta	consav			;save current token
@@ -3058,6 +3047,9 @@ frcinc:	mov	a,m			;get low byte of constant
 	dcx	h			;back to high byte
 	mov	h,m			;get high byte
 	jmp	onei2			;finish scanning
+jfccsc:	call	confac			;5.21: trampoline entry for JC from eval
+conscn:	lhld	contxt			;5.21: get saved text pointer
+	jmp	chrgt2			;and scan thing after constant
 maktkn:	inr	a			;calculate valtype
 	rlc				;*2 to get valtype 0=2, 1=4, 3=8
 	sta	contyp			;contype now setup
@@ -3105,8 +3097,7 @@ confac:
 	inx	h
 	mov	d,m			;get high part
 	xchg				;value to [h,l]
-fltlin:	call	ineg2			;float it
-	jmp	conscn			;restore text ptr
+fltlin:	jmp	ineg2			;5.21: float it (returns via chain)
 ntline:
 	lda	contyp			;get saved constant valtyp
 	sta	valtyp			;save in real valtyp
@@ -3116,10 +3107,9 @@ ntline:
 	shld	faclo			;save them
 	lhld	conlo+2			;get next two bytes
 	shld	faclo+2			;save them
-	jmp	conscn			;scan furthur
+	ret				;5.21: return directly
 confdb:	lxi	h,conlo			;get pointer to saved constant area
-	call	vmovfm			;move into fac
-	jmp	conscn			;restore text ptr & scan following character
+	jmp	vmovfm			;5.21: move into fac (returns via vmovfm)
 	page
 	subttl	defstr, defint, defsng, defdbl, intidx
 defstr:	mvi	e,3			;default some letters to string
@@ -3213,6 +3203,8 @@ lingt3:	xchg				;save text ptr in [d,e]
 	lhld	conlo			;get embedded line #
 	xchg				;restore text ptr.
 	jz	chrgtr			;eat following char
+	xra	a			;5.21: clear consav
+	sta	consav			;5.21: for non-line-constant case
 	dcx	h			;back up pointer
 	lxi	d,0			;zero accumulated line #
 morlin:	call	chrgtr
@@ -3296,6 +3288,8 @@ goto2:
 	xchg				;assume so
 	rz				;if it was, go back to newstt
 					;with [h,l] as text ptr
+	cpi	lincon			;5.21: was it a line number constant?
+	jnz	snerr			;5.21: no, error - invalid constant type
 	xchg				;flip back if not
 	push	h			;save current text ptr on stack
 	lhld	contxt			;get pointer to right after constant
@@ -3698,9 +3692,8 @@ printc:	jz	finprt			;finish by resetting flags
 	inr	m			;size byte is first in descriptor
 
 strdon:					;use folding for strings and #s
-	lhld	ptrfil			;disk output?
-	mov	a,h			;if so, don'T EVER FORCE A CRLF
-	ora	l
+	extrn	ptrchk
+	call	ptrchk			;5.21: disk output?
 	jnz	linch2			;to be sent out
 	lhld	faclo			;get the pointer
 	lda	prtflg
@@ -3716,6 +3709,7 @@ strdon:					;use folding for strings and #s
 	add	m
 	cmc				;set nc if overflow on check
 	jnc	linchk			;start on a new line
+	dcr	a			;5.21: actually equal to line length is ok
 	cmp	b			;check for overlap
 	jmp	linchk
 istty:
@@ -3739,13 +3733,12 @@ linch2:	call	strprt			;print the number
 	pop	h
 	jmp	newchr			;print some more
 comprt:
-	lhld	ptrfil			;outputing into a file?
-	mov	a,h			;if so, [ptrfil] .ne. 0
-	ora	l			;and special print position should
 	extrn	nmlo.c
-	lxi	b,nmlo.c		;be fetched from file data
+	lxi	b,nmlo.c		;5.21: load offset first
+	lhld	ptrfil			;5.21: then load file pointer
 	dad	b			;[h,l] point at position
-	mov	a,m			;if file is active
+	call	ptrchk			;5.21: check if file active (preserves h)
+	mov	a,m			;get position if file is active
 	jnz	morcom
 	lda	prtflg			;output to the line printer?
 	ora	a			;non-zero means yes
@@ -3791,9 +3784,7 @@ spcndc:	mov	a,d
 	jp	tbnong
 	lxi	d,0
 tbnong:	push	h			;save the text pointer
-	lhld	ptrfil			;see if going to disk file
-	mov	a,h
-	ora	l
+	call	ptrchk			;5.21: see if going to disk file
 	jnz	lnomod			;dont mod
 	lda	prtflg			;going to printer?
 	ora	a			;set flags
@@ -3814,12 +3805,10 @@ lnomod:	pop	h			;get back the text pointer
 	sui	spctk			;was it spctk?
 	push	h			;save the text pointer
 	jz	dosizt			;value in [a]
-	lhld	ptrfil			;outputing into a file?
-	mov	a,h			;if so, [ptrfil] .ne. 0
-	ora	l			;and special print position should
-
-	lxi	b,nmlo.c		;be fetched from file data
+	lxi	b,nmlo.c		;5.21: load offset first
+	lhld	ptrfil			;5.21: then load file pointer
 	dad	b			;[h,l] point at position
+	call	ptrchk			;5.21: check if file active (preserves h)
 	mov	a,m			;if file is active
 	jnz	dosizt			;do tab calculation now
 	lda	prtflg			;line printer or tty?
@@ -3981,6 +3970,8 @@ supprs:	call	sinlin
 ; subscripts and the input is scanned to get its type. no assignment
 ; is done
 ;
+	xra	a			;5.21: clear usflg
+	sta	usflg			;reset print flag
 	mvi	m,44			;put a comma in front of buf
 	xchg				;save data pointer in [d,e]
 	pop	h			;get the varlst pointer into [h,l]
@@ -3994,9 +3985,11 @@ varlop:	mvi	a,128			;don'T ALLOW SUBSCRIPTS -- RETURN POINTING TO "("
 	call	ptrget			;scan name and return pointer in [d,e]
 	mov	a,m			;see if it ended on "("
 	dcx	h			;rescan the terminator
+	cpi	'['			;5.21: array subscript can use brackets
+	jz	scnarr			;treat '[' same as '('
 	cpi	'('			;array or not?
 	jnz	endscn			;if not, variable name is done
-	inx	h			;now scan the subscript expression
+scnarr:	inx	h			;now scan the subscript expression
 	mvi	b,0			;initialize the paren count
 scnopn:	inr	b			;up the count for every "("
 scncon:	call	chrgtr			;get the next character
@@ -4005,9 +3998,13 @@ scncon:	call	chrgtr			;get the next character
 	jz	scnstr			;go scan the endtire constant (may contain parens)
 	cpi	'('			;another level of nesting?
 	jz	scnopn			;increment coutn and keep scanning
+	cpi	'['			;5.21: open bracket (no count)
+	jz	scncon			;continue without incrementing count
+	cpi	']'			;5.21: close bracket
+	jz	scncls			;decrement count
 	cpi	')'			;one less level of parens?
 	jnz	scncon			;no, keep scanning
-					;decrement paren count. out of subscript?
+scncls:					;5.21: decrement paren/bracket count
 	dcr	b
 	jnz	scncon			;if not at zero level, keep scanning
 endscn:	call	chrgtr			;get terminating character
@@ -4095,11 +4092,7 @@ datbk:
 	db	366q			;set a non-zero
 scnval:	xra	a			;set zero flag in [a]
 	sta	inppas			;store so early return check works
-	xchg				;save the data pointer
-	lhld	ptrfil			;see if a file read
-	mov	a,h
-	ora	l
-	xchg	
+	call	ptrchk			;5.21: see if a file read (preserves h)
 	jnz	filind			;if so, special handling
 	call	getypr			;is it a string?
 	push	psw			;save the type information
@@ -4304,8 +4297,7 @@ pusval:	lda	valtyp			;find out what type of value we are saving
 	mov	b,m
 	push	b			;push fac-1,0 on the stack
 	jpo	vpushd			;all done if we had a sng
-	inx	h
-	lxi	h,dfaclo		;we have a double precison number
+	lxi	h,dfaclo		;5.21: no inx h - we have a double precison number
 	mov	c,m			;push its 4 lo bytes on the stack
 	inx	h
 	mov	b,m
@@ -4484,7 +4476,8 @@ dodsp:	lda	oprtyp			;recall which operand it was
 ; the fac is double precision and the stack is either
 ; integer or single precision and must be converted
 ; 
-facdbl:	push	b			;save the stack value type
+facdbl:	mov	a,b			;5.21: get stack value type into A
+	push	psw			;save the stack value type
 	call	vmovaf			;move the fac into arg
 	pop	psw			;pop the stack value type into [a]
 	sta	valtyp			;put it in valtyp for the force
@@ -4548,7 +4541,7 @@ eval:
 	call	islet2			;variable name?
 	jnc	isvar			;an alphabetic character means yes
 	cpi	dblcon+1		;is it an embeded constant
-	jc	confac			;rescan the token & restore old text ptr
+	jc	jfccsc			;5.21: go to trampoline (call confac, then conscn)
 	inr	a			;is it a function call (preceded by 377)
 	jz	isfun			;yes, do it
 	dcr	a			;fix a back
@@ -4701,10 +4694,10 @@ nxthex:	dad	h			;shift right four bits
 	dad	h
 	ora	l			;or on new digit
 	mov	l,a			;save back
+	xchg				;5.21: get text pointer back first
 	dcr	b			;too many digits?
-	jz	overr			;yup.
-	xchg				;get text pointer back in [h,l]
-	jmp	lophex			;keep eating
+	jnz	lophex			;keep eating
+	jmp	overr			;yup.
 
 
 lopoc2:	dcx	h			;reget last character
@@ -4897,7 +4890,8 @@ ncase:	sui	3			;subtract correctly
 ; the right hand argument is coerced to integer, just as
 ; the left hand one was when it was pushed on the stack.
 ;
-dandor:	push	b			;save the precedence "OR"=70
+dandor:	mov	a,b			;5.21: get precedence into A
+	push	psw			;save the precedence "OR"=70
 	call	frcint			;coerce right hand argument to integer
 	pop	psw			;get back the precedence to distinguish
 					;"AND" and "OR"
@@ -4988,12 +4982,12 @@ usrfn:	call	scnusr			;scan the usr#
 	push	d			;save pointer
 	call	parchk			;eat left paren and formula
 	xthl				;save text pointer & get index into usrtab
-	mov	c,m			;get dispatch adress
+	mov	e,m			;5.21: get dispatch adress into DE
 	inx	h			;bump pointer
-	mov	b,m			;pick up 2nd byte of address
+	mov	d,m			;pick up 2nd byte of address
 	lxi	h,pophrt		;get address of pop h ret
 	push	h			;push it on
-	push	b			;save address of usr routine
+	push	d			;save address of usr routine
 	lda	valtyp			;get argument type in [a]
 	push	psw			;save valtyp
 	cpi	3			;string??
@@ -5096,7 +5090,8 @@ fndoer:	call	getfnm			;get a pointer to
 	inx	h			;which is a text pointer at the formal
 	mov	h,m			;parameter list in the definition
 	mov	l,a
-	ora	h			;a zero text pointer means the function
+	mov	a,h			;5.21: test for zero text pointer
+	ora	l			;a zero text pointer means the function
 					;was never defined
 	jz	uferr			;if so, given an "UNDEFINED FUNCTION" error
 	mov	a,m			;see if there are any parameters
@@ -5340,11 +5335,11 @@ ismid$:	cpi	377o-$end		;lhs mid$?
 	jnz	snerr			;no, error.
 	inx	h			;point to next char
 	mov	a,m			;get fn descriptor
+	inx	h			;5.21: bump pointer first
 	cpi	midtk			;is it mid?
-	jnz	snerr			;no, error
-	inx	h			;bump pointer
+	jz	lhsmid			;5.21: yes, go to lhsmid
+	jmp	snerr			;no, error
 	extrn	lhsmid			;code is in bistrs.mac
-	jmp	lhsmid
 	page
 	subttl	inp, out, wait, console, width
 ;
@@ -5379,11 +5374,12 @@ fnwait:	call	setio			;set up for wait
 	call	synchr
 	db	44			;make sure there is a ","
 	call	getbyt
-notthr:	pop	b			;reget the "AND" mask
+notthr:	pop	psw			;5.21: reget the "AND" mask
+	mov	d,a			;save mask in D
 lopinp:
 stainp:	in	0			;the input instr
 	xra	e			;xor with mask2
-	ana	b			;and with mask
+	ana	d			;5.21: and with mask in D
 	jz	lopinp			;loop until result is non-zero
 					;note: this loop cannot be control-c'ED
 					;unless the wait is being done on channel
@@ -5399,13 +5395,14 @@ width:
 	call	chrgtr			;fetch next char
 	call	getbyt			;get width
 	sta	lptsiz			;save it
+	mov	e,a			;5.21: setup E for morcp3
 	call	morcp3			;compute last comma column
 	sta	nlppos			;save it
 	ret	
 notwlp:
 	call	getbyt			;get the channel #
 	sta	linlen			;setup the line length
-morcp2:
+morcp2:	mov	e,a			;5.21: setup E for morcp3
 	call	morcp3
 	sta	clmlst			;set last comma posit
 	ret				;done
@@ -5473,12 +5470,8 @@ list4:	lxi	h,0+65535		;dont allow ^c to change
 	inx	h
 	mov	a,b			;see if end of chain
 	ora	c
-	jz	ready			;last line, stop.  
-	push	h			;don'T ALLOW ^C
-	lhld	ptrfil
-	mov	a,h			;on file output
-	ora	l
-	pop	h
+	jz	ready			;last line, stop.
+	call	ptrchk			;5.21: check ptrfil (preserves h)
 	cz	iscntc
 					;check for control-c
 	push	b			;save link
@@ -5576,18 +5569,26 @@ ploopr:
 	ani	177o			;turn off high bit
 ntfntk:	inx	h			;advance to point after
 	cpi	sngqtk			;single quote token?
-	jnz	ntqttk			;no, jump out
-	dcx	b			;move deposit ptr back over :$rem
+	jnz	ntqttk			;5.21: skip if not sngqtk
+	dcx	b			;back up deposit ptr 4 bytes
 	dcx	b
 	dcx	b
 	dcx	b
+	inr	d			;adjust char count
 	inr	d
 	inr	d
 	inr	d
-	inr	d			;fix up char count
-ntqttk:	cpi	$else			;else?
-	cz	dcxbrt			;move deposit ptr back over leading colon.
-	push	h			;save text ptr.
+ntqttk:	cpi	0A2h			;5.21: check for token A2
+	cz	dcx4bd			;5.21: call dcx4bd if match
+	cpi	0B4h			;else? (5.21 token value)
+	jnz	ntqtt1			;5.21: skip if not else
+	mov	a,m			;get next byte
+	inx	h
+	cpi	0F2h			;check token
+	mvi	a,0B4h			;restore else value (5.21)
+	jz	ntqtt1			;skip if matched
+	dcx	h			;back up
+ntqtt1:	push	h			;save text ptr.
 	push	b			;save deposit ptr.
 	push	d			;save char count.
 	lxi	h,reslst-1		;get ptr to start of reserved word list
@@ -5811,17 +5812,21 @@ peek:	call	frqint			;get an integer in [h,l]
 	mov	a,m			;get the value to return
 	jmp	sngflt			;and float it
 poke:	call	frmevl			;read a formula
-	push	h			;save text ptr
+	push	d			;5.21: save DE
 	call	frqint			;force value into int in [h,l]
-	xthl				;put value on stack & get txt ptr back
-					;save value on stack
 	call	prodir			;dont allow direct if protected file
-	call	synchr
-	db	44			;check for a comma
+	db	44			;5.21: comma check inline
 	call	getbyt
 	pop	d			;get the address back
 	stax	d			;store it away
 	ret				;scanned everything
+;5.21: helper routine for address evaluation
+	call	frmevl
+	push	h
+	call	frqint
+	xchg
+	pop	h
+	ret
 	public	frqint
 frqint:	lxi	b,frcint		;return here
 	push	b			;save addr
@@ -5830,9 +5835,9 @@ frqint:	lxi	b,frcint		;return here
 	lda	fac			;get exponent
 	cpi	220o			;is magnitude .gt. 32767
 	rnz				;no, force integer
-	lda	fac-1			;get sign of number
-	ora	a			;is it negative, only allowable # is -32768
+	call	signc			;5.21: call signc instead of inline
 	rm				;assume thats what it is, else give overflow
+	call	0			;5.21: unknown call
 	lxi	b,221q*256+200q
 	lxi	d,0*256+0		;get -65536.
 	jmp	fadd			;subtract it, and then force integer
@@ -5905,10 +5910,10 @@ nxtrsc:	dad	b			;add increment into
 	jc	fcerr			;uh oh, his inc was too large.
 nxtrsl:	push	d			;save current line accum
 	mov	e,m			;get link field into [d,e]
-	mov	a,e			;get low part into k[a] for zero test
-	inx	h
+	inx	h			;5.21: reorder
 	mov	d,m			;get high part of link
-	ora	d			;set cc'S ON LINK FIELD
+	mov	a,d			;5.21: get high part into [a]
+	ora	e			;set cc'S ON LINK FIELD
 	xchg				;see if next link zero
 	pop	d			;get back accum line #
 	jz	ressd1			;zero, done
@@ -5927,10 +5932,10 @@ ressd1:	push	b			;save inc
 
 resnx1:	push	d			;save current line
 	mov	e,m			;get link field
-	mov	a,e			;prepare for zero link field test
-	inx	h
+	inx	h			;5.21: reorder
 	mov	d,m
-	ora	d
+	mov	a,d
+	ora	e
 	jz	sccall			;stop reseqing when see end of pgm
 	xchg				;flip line ptr, link field
 	xthl				;put link on stack, get new line # off
@@ -6121,7 +6126,7 @@ strnds:	shld	rndx+1
 	call	rndmn2
 	pop	h			;get back the text pointer
 	ret	
-ranmes:	dc	'Random number seed (-32768- to 32767)'
+ranmes:	dc	'Random number seed (-32768 to 32767)'
 	db	0
 
 ;

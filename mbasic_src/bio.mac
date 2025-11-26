@@ -67,13 +67,11 @@ trurom	set	0
 ;		see outdo above. see below code for register use
 	extrn	ppswrt
 	public	inchr,outdo,fininl,crfin
+	extrn	ptrchk			;5.21: ptrchk moved to bistrs.mac
 outdo:	push	psw
 	push	h
-	extrn	ptrfil
-	lhld	ptrfil
+	call	ptrchk			;5.21: check if disk output
 outcon:
-	mov	a,h
-	ora	l
 	extrn	filout
 	jnz	filout
 	pop	h
@@ -233,15 +231,11 @@ conout:	call	0			;cpm (bios) entry point
 	subttl	inchr, tryin - character input routines
 	public	inchr,tryin
 inchr:
-	push	h
-	lhld	ptrfil
-	mov	a,h
-	ora	l
+	call	ptrchk			;5.21: check if disk file input
 	jz	notflc			;get character from terminal
 	extrn	indskc
 	call	indskc			;read a character
-	extrn	pophrt
-	jnc	pophrt			;return with character
+	rnc				;5.21: return directly with character
 	push	b			;save all registers
 	push	d
 	push	h
@@ -274,8 +268,8 @@ inchr:
 	pop	b
 	xra	a
 	pop	h
-	ret	
-notflc:	pop	h
+	ret
+notflc:					;5.21: removed pop h - ptrchk preserves h
 tryin:
 	public	inchri
 inchri:
@@ -334,11 +328,7 @@ crdo:
 	public	crfino
 crfino:	call	outdo
 crfin:
-	push	h			;save [h,l]
-	lhld	ptrfil			;see if outputting to disk
-	mov	a,h			;if so, ptrfil .ne. 0
-	ora	l			;...
-	pop	h			;restore [h,l]
+	call	ptrchk			;5.21: check if outputting to disk
 	jz	crcont			;not disk file, continue
 	xra	a			;crfin must always return with a=0
 	ret				;and carry=0.

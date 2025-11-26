@@ -212,3 +212,64 @@ The 5.21 savings likely come from this routine being shared elsewhere in codebas
 ### State
 - Git checkout reverted bintrp.mac - need to re-apply order10 changes
 - 16-byte difference still unexplained
+
+## Session Notes (2024-11-26 continued)
+
+### Reserved Word Table Reordering
+
+Fixed the order of entries within the alpha-dispatch reserved word tables to match 5.21:
+
+1. **atab**: Moved AUTO before AND
+2. **dtab**: Moved DELETE to first position
+3. **etab**: Moved ELSE before END
+4. **ltab**: Moved LPRINT, LLIST, LPOS before LET, LINE, LOAD, LSET
+5. **otab**: Moved OPEN before OUT
+6. **ptab**: Moved PRINT before PUT
+7. **rtab**: Moved RETURN before READ
+8. **ttab**: Moved THEN before TRON
+
+### GO Code Restructured (5.21 style)
+
+Replaced 5.22 inline CPI-based GO handling with 5.21 strcm subroutine style:
+
+```asm
+; 5.21 structure
+    push h           ; save text pointer
+    lxi d,gostr      ; "GO " string
+    call gostrcm     ; compare
+    jnz notgos
+    call chrgtr      ; advance
+    lxi d,tostr      ; "TO"
+    call gostrcm
+    mvi a,$goto
+    jz gputrs
+    lxi d,ubstr      ; "UB"
+    call gostrcm
+    jnz notgos
+    mvi a,$gosub
+gputrs: pop b
+    jmp notfn2
+gostrcm: <14-byte subroutine>
+gostr: db 'GO ',0
+tostr: db 'TO',0
+ubstr: db 'UB',0
+```
+
+GO code size: 63 bytes (matches reference)
+
+### Current Status
+
+- Reference: 24320 bytes
+- Our build (mbasic_go.com): 24335 bytes
+- Difference: **15 bytes still unexplained**
+
+Both SIN and GO code structures match the reference. The 15-byte difference is elsewhere in the codebase.
+
+### Files Modified
+
+- `mbasic_src/bintrp.mac` - Table reordering + GO restructure
+- `out/mbasic_go.com` - Current best build
+
+### Next Steps
+
+Continue walk_compare from data section (past 0x0700) to find structural code differences.
