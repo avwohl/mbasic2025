@@ -1,0 +1,18 @@
+; Self-contained test for um80/ul80
+	TITLE	TEST2
+	PUBLIC	START
+
+	CSEG
+
+START:	LXI	SP,STACK
+	MVI	A,0
+LOOP:	INR	A
+	CPI	10
+	JNZ	LOOP
+	HLT
+
+	DSEG
+	DS	64
+STACK	EQU	$
+
+	END	START

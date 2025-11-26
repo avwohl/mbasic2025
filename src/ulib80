@@ -1,0 +1,457 @@
+#!/usr/bin/env python3
+"""
+ulib80 - Microsoft LIB-80 compatible library manager for Linux.
+
+Usage:
+    ulib80 -c library.lib file1.rel file2.rel ...   Create library
+    ulib80 -l library.lib                           List contents
+    ulib80 -x library.lib [module ...]              Extract modules
+    ulib80 -a library.lib file.rel ...              Add modules
+    ulib80 -d library.lib module ...                Delete modules
+    ulib80 -p library.lib                           Print public symbols
+"""
+
+import sys
+import os
+import argparse
+import struct
+from pathlib import Path
+
+# Add src directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from relformat import RELReader
+
+
+class LibraryError(Exception):
+    """Library error."""
+    pass
+
+
+class Module:
+    """A module in a library."""
+    def __init__(self, name, data=None):
+        self.name = name.upper()
+        self.data = data or bytearray()
+        self.publics = []  # List of public symbol names
+        self.size = len(self.data) if data else 0
+
+    def __repr__(self):
+        return f"Module({self.name}, {self.size} bytes, {len(self.publics)} publics)"
+
+
+class Library:
+    """A .LIB library file."""
+
+    # Library file format:
+    # - Magic: "ULIB" (4 bytes)
+    # - Version: 1 (2 bytes)
+    # - Module count (2 bytes)
+    # - For each module:
+    #   - Name length (1 byte)
+    #   - Name (N bytes)
+    #   - Data offset (4 bytes)
+    #   - Data size (4 bytes)
+    #   - Public count (2 bytes)
+    #   - For each public:
+    #     - Symbol length (1 byte)
+    #     - Symbol name (N bytes)
+    # - Module data (concatenated)
+
+    MAGIC = b'ULIB'
+    VERSION = 1
+
+    def __init__(self):
+        self.modules = []  # List of Module objects
+        self.symbol_index = {}  # symbol_name -> module_name
+
+    def add_rel_file(self, filename):
+        """Add a .REL file to the library."""
+        with open(filename, 'rb') as f:
+            data = f.read()
+
+        name = Path(filename).stem.upper()
+
+        # Check if module already exists
+        for mod in self.modules:
+            if mod.name == name:
+                raise LibraryError(f"Module '{name}' already exists in library")
+
+        module = Module(name, bytearray(data))
+
+        # Parse the REL file to extract public symbols
+        module.publics = self._extract_publics(data)
+
+        # Update symbol index
+        for sym in module.publics:
+            if sym in self.symbol_index:
+                print(f"Warning: Symbol '{sym}' defined in multiple modules", file=sys.stderr)
+            self.symbol_index[sym] = name
+
+        self.modules.append(module)
+
+    def _extract_publics(self, data):
+        """Extract public symbol names from REL data."""
+        publics = set()
+        try:
+            reader = RELReader(data)
+            while True:
+                try:
+                    item = reader.read_item()
+                    if item is None:
+                        break
+                    if item[0] == 'DEFINE_ENTRY':
+                        # Public symbol definition
+                        _, name = item[1], item[2]
+                        publics.add(name.upper())
+                    elif item[0] == 'ENTRY_SYMBOL':
+                        # Entry symbol (also public)
+                        name = item[1]
+                        publics.add(name.upper())
+                    elif item[0] == 'END_FILE':
+                        break
+                except EOFError:
+                    break
+        except Exception as e:
+            print(f"Warning: Error parsing REL data: {e}", file=sys.stderr)
+        return list(publics)
+
+    def remove_module(self, name):
+        """Remove a module from the library."""
+        name = name.upper()
+        for i, mod in enumerate(self.modules):
+            if mod.name == name:
+                # Remove from symbol index
+                for sym in mod.publics:
+                    if self.symbol_index.get(sym) == name:
+                        del self.symbol_index[sym]
+                del self.modules[i]
+                return True
+        return False
+
+    def get_module(self, name):
+        """Get a module by name."""
+        name = name.upper()
+        for mod in self.modules:
+            if mod.name == name:
+                return mod
+        return None
+
+    def find_module_for_symbol(self, symbol):
+        """Find which module defines a symbol."""
+        return self.symbol_index.get(symbol.upper())
+
+    def save(self, filename):
+        """Save library to file."""
+        with open(filename, 'wb') as f:
+            # Write header
+            f.write(self.MAGIC)
+            f.write(struct.pack('<H', self.VERSION))
+            f.write(struct.pack('<H', len(self.modules)))
+
+            # Calculate data offsets
+            # First, calculate index size
+            index_size = 8  # Magic + version + count
+            for mod in self.modules:
+                index_size += 1 + len(mod.name.encode('ascii'))  # Name
+                index_size += 4 + 4  # Offset + size
+                index_size += 2  # Public count
+                for pub in mod.publics:
+                    index_size += 1 + len(pub.encode('ascii'))
+
+            # Write module index
+            data_offset = index_size
+            for mod in self.modules:
+                # Name
+                name_bytes = mod.name.encode('ascii')
+                f.write(struct.pack('B', len(name_bytes)))
+                f.write(name_bytes)
+
+                # Offset and size
+                f.write(struct.pack('<I', data_offset))
+                f.write(struct.pack('<I', len(mod.data)))
+                data_offset += len(mod.data)
+
+                # Publics
+                f.write(struct.pack('<H', len(mod.publics)))
+                for pub in mod.publics:
+                    pub_bytes = pub.encode('ascii')
+                    f.write(struct.pack('B', len(pub_bytes)))
+                    f.write(pub_bytes)
+
+            # Write module data
+            for mod in self.modules:
+                f.write(mod.data)
+
+    @classmethod
+    def load(cls, filename):
+        """Load library from file."""
+        lib = cls()
+
+        with open(filename, 'rb') as f:
+            # Read header
+            magic = f.read(4)
+            if magic != cls.MAGIC:
+                raise LibraryError(f"Invalid library file (bad magic: {magic})")
+
+            version = struct.unpack('<H', f.read(2))[0]
+            if version != cls.VERSION:
+                raise LibraryError(f"Unsupported library version: {version}")
+
+            module_count = struct.unpack('<H', f.read(2))[0]
+
+            # Read module index
+            modules_info = []
+            for _ in range(module_count):
+                name_len = struct.unpack('B', f.read(1))[0]
+                name = f.read(name_len).decode('ascii')
+
+                offset = struct.unpack('<I', f.read(4))[0]
+                size = struct.unpack('<I', f.read(4))[0]
+
+                pub_count = struct.unpack('<H', f.read(2))[0]
+                publics = []
+                for _ in range(pub_count):
+                    pub_len = struct.unpack('B', f.read(1))[0]
+                    pub = f.read(pub_len).decode('ascii')
+                    publics.append(pub)
+
+                modules_info.append((name, offset, size, publics))
+
+            # Read module data
+            for name, offset, size, publics in modules_info:
+                f.seek(offset)
+                data = f.read(size)
+
+                mod = Module(name, bytearray(data))
+                mod.publics = publics
+                lib.modules.append(mod)
+
+                # Update symbol index
+                for sym in publics:
+                    lib.symbol_index[sym] = name
+
+        return lib
+
+
+def cmd_create(args):
+    """Create a new library."""
+    lib = Library()
+
+    for relfile in args.files:
+        if not os.path.exists(relfile):
+            print(f"Error: File not found: {relfile}", file=sys.stderr)
+            return 1
+        try:
+            lib.add_rel_file(relfile)
+            print(f"  Added: {Path(relfile).stem.upper()}")
+        except LibraryError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+
+    lib.save(args.library)
+    print(f"Created library: {args.library}")
+    print(f"  Modules: {len(lib.modules)}")
+    print(f"  Symbols: {len(lib.symbol_index)}")
+    return 0
+
+
+def cmd_list(args):
+    """List library contents."""
+    if not os.path.exists(args.library):
+        print(f"Error: Library not found: {args.library}", file=sys.stderr)
+        return 1
+
+    try:
+        lib = Library.load(args.library)
+    except LibraryError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    print(f"Library: {args.library}")
+    print(f"Modules: {len(lib.modules)}")
+    print()
+
+    for mod in lib.modules:
+        print(f"  {mod.name:12s}  {mod.size:6d} bytes  {len(mod.publics):3d} publics")
+
+    return 0
+
+
+def cmd_publics(args):
+    """Print public symbols."""
+    if not os.path.exists(args.library):
+        print(f"Error: Library not found: {args.library}", file=sys.stderr)
+        return 1
+
+    try:
+        lib = Library.load(args.library)
+    except LibraryError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    print(f"Library: {args.library}")
+    print(f"Public symbols:")
+    print()
+
+    # Group by module
+    for mod in lib.modules:
+        if mod.publics:
+            print(f"  {mod.name}:")
+            for pub in sorted(mod.publics):
+                print(f"    {pub}")
+            print()
+
+    return 0
+
+
+def cmd_extract(args):
+    """Extract modules from library."""
+    if not os.path.exists(args.library):
+        print(f"Error: Library not found: {args.library}", file=sys.stderr)
+        return 1
+
+    try:
+        lib = Library.load(args.library)
+    except LibraryError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    # If no modules specified, extract all
+    if not args.modules:
+        modules_to_extract = [mod.name for mod in lib.modules]
+    else:
+        modules_to_extract = [m.upper() for m in args.modules]
+
+    for name in modules_to_extract:
+        mod = lib.get_module(name)
+        if not mod:
+            print(f"Warning: Module '{name}' not found in library", file=sys.stderr)
+            continue
+
+        outfile = f"{name.lower()}.rel"
+        with open(outfile, 'wb') as f:
+            f.write(mod.data)
+        print(f"  Extracted: {name} -> {outfile}")
+
+    return 0
+
+
+def cmd_add(args):
+    """Add modules to library."""
+    if not os.path.exists(args.library):
+        print(f"Error: Library not found: {args.library}", file=sys.stderr)
+        return 1
+
+    try:
+        lib = Library.load(args.library)
+    except LibraryError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    for relfile in args.files:
+        if not os.path.exists(relfile):
+            print(f"Error: File not found: {relfile}", file=sys.stderr)
+            return 1
+        try:
+            lib.add_rel_file(relfile)
+            print(f"  Added: {Path(relfile).stem.upper()}")
+        except LibraryError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+
+    lib.save(args.library)
+    print(f"Updated library: {args.library}")
+    print(f"  Modules: {len(lib.modules)}")
+    return 0
+
+
+def cmd_delete(args):
+    """Delete modules from library."""
+    if not os.path.exists(args.library):
+        print(f"Error: Library not found: {args.library}", file=sys.stderr)
+        return 1
+
+    try:
+        lib = Library.load(args.library)
+    except LibraryError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    for name in args.modules:
+        if lib.remove_module(name):
+            print(f"  Deleted: {name.upper()}")
+        else:
+            print(f"Warning: Module '{name}' not found in library", file=sys.stderr)
+
+    lib.save(args.library)
+    print(f"Updated library: {args.library}")
+    print(f"  Modules: {len(lib.modules)}")
+    return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='ulib80 - LIB-80 compatible library manager',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  ulib80 -c mylib.lib foo.rel bar.rel    Create library from REL files
+  ulib80 -l mylib.lib                    List modules in library
+  ulib80 -p mylib.lib                    List public symbols
+  ulib80 -x mylib.lib                    Extract all modules
+  ulib80 -x mylib.lib FOO BAR            Extract specific modules
+  ulib80 -a mylib.lib baz.rel            Add module to library
+  ulib80 -d mylib.lib FOO                Delete module from library
+"""
+    )
+
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-c', '--create', action='store_true',
+                       help='Create new library')
+    group.add_argument('-l', '--list', action='store_true',
+                       help='List library contents')
+    group.add_argument('-p', '--publics', action='store_true',
+                       help='Print public symbols')
+    group.add_argument('-x', '--extract', action='store_true',
+                       help='Extract modules')
+    group.add_argument('-a', '--add', action='store_true',
+                       help='Add modules to library')
+    group.add_argument('-d', '--delete', action='store_true',
+                       help='Delete modules from library')
+
+    parser.add_argument('library', help='Library file (.lib)')
+    parser.add_argument('files', nargs='*', help='REL files or module names')
+
+    args = parser.parse_args()
+
+    # Route to appropriate command
+    if args.create:
+        if not args.files:
+            print("Error: No input files specified", file=sys.stderr)
+            return 1
+        return cmd_create(args)
+    elif args.list:
+        return cmd_list(args)
+    elif args.publics:
+        return cmd_publics(args)
+    elif args.extract:
+        args.modules = args.files
+        return cmd_extract(args)
+    elif args.add:
+        if not args.files:
+            print("Error: No input files specified", file=sys.stderr)
+            return 1
+        return cmd_add(args)
+    elif args.delete:
+        if not args.files:
+            print("Error: No modules specified", file=sys.stderr)
+            return 1
+        args.modules = args.files
+        return cmd_delete(args)
+
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
