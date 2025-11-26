@@ -66,7 +66,7 @@ class Macro:
 class Assembler:
     """MACRO-80 compatible assembler."""
 
-    def __init__(self):
+    def __init__(self, predefined=None):
         self.symbols = {}  # Symbol table
         self.macros = {}   # Macro definitions
         self.segments = {
@@ -103,6 +103,12 @@ class Assembler:
 
         self.entry_point = None  # END address if specified
         self.module_name = None
+
+        # Add predefined symbols from command line
+        if predefined:
+            for name, value in predefined.items():
+                sym = Symbol(name, value, ADDR_ABSOLUTE, defined=True)
+                self.symbols[name] = sym
 
         # External reference chains
         self.ext_chains = {}  # name -> list of (seg, offset, expr_offset) references
@@ -967,6 +973,8 @@ class Assembler:
                 if (op.startswith("'") and op.endswith("'")) or \
                    (op.startswith('"') and op.endswith('"')):
                     s = op[1:-1]
+                    # Handle '' escape sequence (doubled apostrophe = single apostrophe)
+                    s = s.replace("''", "'")
                     for ch in s:
                         self.emit_byte(ord(ch))
                 else:
@@ -977,7 +985,7 @@ class Assembler:
                         self.emit_byte(val)
             return True
 
-        # DC - define character (with high bit set on last char)
+        # DC - define character string (M80 compatible - no high bit modification)
         if operator == 'DC':
             if len(ops) != 1:
                 self.error("DC requires one string operand")
@@ -986,14 +994,13 @@ class Assembler:
             if (op.startswith("'") and op.endswith("'")) or \
                (op.startswith('"') and op.endswith('"')):
                 s = op[1:-1]
+                # Handle '' escape sequence (doubled apostrophe = single apostrophe)
+                s = s.replace("''", "'")
                 if not s:
                     self.error("DC requires non-empty string")
                     return True
-                for i, ch in enumerate(s):
-                    if i == len(s) - 1:
-                        self.emit_byte(ord(ch) | 0x80)
-                    else:
-                        self.emit_byte(ord(ch))
+                for ch in s:
+                    self.emit_byte(ord(ch))
             else:
                 self.error("DC requires a string operand")
             return True
@@ -1661,6 +1668,8 @@ def main():
     parser.add_argument('input', help='Input .MAC file')
     parser.add_argument('-o', '--output', help='Output .REL file')
     parser.add_argument('-l', '--listing', help='Listing .PRN file')
+    parser.add_argument('-D', '--define', action='append', metavar='SYMBOL[=VALUE]',
+                        help='Define symbol (can be used multiple times)')
 
     args = parser.parse_args()
 
@@ -1671,8 +1680,21 @@ def main():
     else:
         output_path = input_path.with_suffix('.rel')
 
+    # Parse command line symbol definitions
+    predefined = {}
+    if args.define:
+        for defn in args.define:
+            if '=' in defn:
+                name, val = defn.split('=', 1)
+                try:
+                    predefined[name.upper()] = int(val, 0)
+                except ValueError:
+                    predefined[name.upper()] = 1
+            else:
+                predefined[defn.upper()] = 1
+
     # Create assembler and run
-    asm = Assembler()
+    asm = Assembler(predefined=predefined)
     success = asm.assemble(args.input)
 
     # Report errors and warnings

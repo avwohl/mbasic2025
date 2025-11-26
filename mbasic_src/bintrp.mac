@@ -1424,9 +1424,6 @@ errwh	set	q
 q	set	q+1
 	db	'WEND without WHILE',0
 errwe	set	q
-q	set	q+1
-	db	'Graphics statement not implemented',0
-errgs	set	q
 nondsk	set	q			;last non disk error.
 
 q	set	49			;disk errors start at 50.
