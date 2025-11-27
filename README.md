@@ -22,7 +22,8 @@ A set of sources labeled "MBASIC 5.2" exists, but while they are in the same fam
 ```
 mbasic2025/
 ├── mbasic_52/          # Original MBASIC 5.2 sources (reference)
-├── mbasic_521/
+├── mbasic_521/         # recreated 5.21 sources
+├── mbasicz/            # latest available, optimized for z80
 │   ├── mbasic_src/     # Reconstructed 5.21 sources
 │   ├── com/            # Reference mbasic.com 5.21 binary
 │   ├── disasm/         # Disassembly of mbasic.com
