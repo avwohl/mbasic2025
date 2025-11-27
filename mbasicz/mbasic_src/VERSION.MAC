@@ -1,3 +1,0 @@
-; MBASIC version control
-; Set mbvers to target version: 521 = 5.21, 522 = 5.22
-mbvers	set	521
