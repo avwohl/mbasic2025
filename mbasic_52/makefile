@@ -29,4 +29,4 @@ $(TARGET): $(OBJECTS)
 
 # Pattern rule to compile .cc files into .o object files                                # $< is the first dependency (the .cc file)                                             # $@ is the target (the .o file)                                                                 
 %.rel: %.mac
-	echo um80 -o $@ -l $*.prn $<
+	um80 -o $@ -l $*.prn $<
