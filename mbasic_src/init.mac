@@ -79,7 +79,7 @@ initsa:
 	dcx	h
 	mvi	m,0
 	extrn	lrun
-	lhld	cpmfil			;point to start of command line
+	lhld	temp8			;point to start of command line
 	mov	a,m			;get byte pointed to
 	ora	a			;if zero, no file seen
 	jnz	lrun			;try to run file
@@ -91,7 +91,7 @@ init:
 	xra	a			;initialize protect flag
 	extrn	proflg
 	sta	proflg
-	extrn	topmem,fretop
+	extrn	topmem,fretop,temp8
 	shld	topmem
 	sphl				;5.21: set stack to topmem
 	lxi	h,cpmwri+1		;5.21: point past cpmwri
@@ -184,7 +184,7 @@ cpmvr1:	shld	cpmrea			;save read/write codes
 	mvi	a,3			;default files
 	sta	maxfil			;by setting maxfil=3
 	lxi	h,zerob			;point at zero byte
-	shld	cpmfil			;so if re-initailize ok
+	shld	temp8			;so if re-initailize ok
 	lda	comagn			;have we already read command line
 	ora	a			;and got error?
 	jnz	errcmd			;then default
@@ -195,7 +195,7 @@ tbuff	set	cpmwrm+128		;where cp/m command buffer is located
 	lxi	h,tbuff			;point to first char of command buffer
 	mov	a,m			;which contains # of chars in command
 	ora	a			;is there a command?
-	shld	cpmfil			;save pointer to this zero
+	shld	temp8			;save pointer to this zero
 	jz	doncmd			;nothing in command buffer
 	mov	b,m			;and [b]
 	inx	h			;point to first char in buffer
@@ -208,7 +208,7 @@ tbflp:	mov	a,m			;get char from buffer
 	jnz	tbflp			;keep moving chars
 	dcx	h			;back up pointer
 endcmd:	mvi	m,0			;store terminator for chrget (0)
-	shld	cpmfil			;save pointer to new zero (old destroyed)
+	shld	temp8			;save pointer to new zero (old destroyed)
 	lxi	h,tbuff-1		;point to char before buffer
 	call	chrgtr			;ignore leading spaces
 	ora	a
@@ -217,7 +217,7 @@ endcmd:	mvi	m,0			;store terminator for chrget (0)
 	jz	fndslh			;yes
 	dcx	h			;back up pointer
 	mvi	m,34			;store double quote
-	shld	cpmfil			;save pointer to start of file name
+	shld	temp8			;save pointer to start of file name
 	inx	h			;bump pointer
 isslh:	cpi	swtchr			;option?
 	jz	fndslh			;yes
@@ -227,6 +227,8 @@ isslh:	cpi	swtchr			;option?
 	jmp	doncmd			;thats eit
 fndslh:	mvi	m,0			;store terminator over "/"
 scansw:	call	chrgtr			;get char after slash
+	extrn	makupl
+	call	makupl			;5.21: convert to uppercase
 scans1:
 	cpi	'S'			;is it /s: ? (set max record size)
 	jz	wass			;yes
@@ -267,17 +269,13 @@ wass:	call	chrgtr			;get char after "S"
 	xchg	
 	jmp	fok			;continue scanning
 zerob:	db	0			;zero byte
-cpmfil:	ds	2			;pointer to basic load file
 comagn:	db	0			;we havent scanned command yet
 errcmd:
 doncmd:
 askmem:
 usedef:	dcx	h
 	lhld	memsiz			;get size of memory
-	push	h			;also save for later
-					;set up default string space
-	pop	h
-	dcx	h			;always leave top byte unused because
+	dcx	h			;5.21: always leave top byte unused because
 					;val(string) makes byte in memory
 					;beyond last char of string=0
 	shld	memsiz			;save in real memory size
@@ -387,8 +385,6 @@ smlstk:	mov	a,e			;subtract stack size from top mem
 	call	crdo			;print carriage return
 	extrn	readyr
 	lxi	h,readyr
-	extrn	jmpini
-	shld	jmpini+1
 	jmp	initsa
 
 
@@ -416,7 +412,7 @@ heding:
 	db	13,10
 	db	0
 lastwr::				;last word of system code+1
-	ds	53	;space for temp stack (was 64, adjusted for 5.21)
+	ds	7	;space for temp stack (5.21 uses only 7 bytes)
 tstack:
 					;make sure last word punched is ok
 	end	
