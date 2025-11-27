@@ -463,6 +463,8 @@ okgetm:	xra	a			;no run option with "MERGE"
 	sta	lstfre			;set up the flag
 	call	indskc			;read from [ptrfil] file
 	jc	main			;go back if eof
+	inr	a			;5.21: first check
+	jz	derbfm			;5.21: check for 255
 	inr	a			;is it a binary file??
 	jz	derbfm			;binary is wrong file mode
 maingo:	lhld	ptrfil			;get file pointer
