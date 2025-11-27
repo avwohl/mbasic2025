@@ -760,12 +760,13 @@ nodev:	dcx	h			;back up pointer
 	inr	e			;increment char count to compensate for next decr
 	mvi	c,'A'-1			;use currently selected drive
 chkfil:	dcr	e			;decrment char count
-	jz	dernmf			;error if no filename
+	jz	nmflcl			;error if no filename
 	mov	a,c			;get drive #
+	ani	337o			;5.21: convert to uppercase
 	sui	'A'-1			;convert to logical number
-	jc	dernmf			;not in range
+	jc	nmflcl			;not in range
 	cpi	27			;bigger than 27
-	jnc	dernmf			;not allowed
+	jnc	nmflcl			;not allowed
 	lxi	b,filnam		;where to put name
 	stax	b			;store disk # in fcb
 	inx	b			;point to where first char of file name is stored
@@ -796,9 +797,9 @@ gotnam:
 
 fillnm:	mov	a,d			;get # of chars
 	cpi	11+8*0-2*0		;initial position?
-	jz	dernmf			;dont allow null filename
+	jz	nmflcl			;dont allow null filename
 	cpi	3			;filled field?
-	jc	dernmf			;no, but 2nd "."
+	jc	nmflcl			;no, but 2nd "."
 	rz				;yes, back to loop
 filln1:	mvi	a,' '			;fill with space
 	stax	b
@@ -814,6 +815,7 @@ filsp2:	mvi	a,' '			;space
 	dcr	d			;filled whole field?
 	jnz	filsp2			;no, more spaces
 	jmp	gotnam			;yes, make sure name ok
+nmflcl:	jmp	dernmf			;5.21: local stub for error jumps
 	page
 name::
 	call	namfil			;pick up the old name to use
@@ -878,7 +880,7 @@ open::	lxi	b,finprt		;zero ptrfil when done
 	inx	h
 	mov	b,m
 	ldax	b			;[a]=mode character
-	ani	-1-' '			;force to upper case
+	ani	337o			;force to upper case (0DFH)
 	mvi	d,md.sqo		;assume its "O"
 	cpi	'O'			;is it?
 	jz	havmod			;[d] has correct mode
@@ -907,8 +909,6 @@ prgfil:	mov	e,a			;save file number in [e]
 	call	filidx			;[b,c] point at file data block
 	jnz	derfao			;if non zero mode, "FILE ALREADY OPEN"
 	pop	d			;[d]=file mode
-	mov	a,d			;file mode to [a]
-	stax	b			;save in file block
 	push	b			;save pointer at file data block
 	push	d			;save back file mode and number
 	call	namfil			;read the name
@@ -917,7 +917,7 @@ prgfil:	mov	e,a			;save file number in [e]
 	push	b			;save back
 	extrn	varecs
 	push	psw			;save extension flag
-	ldax	b			;get file mode
+	mov	a,d			;5.21: get file mode from D
 	call	varecs			;scan record length field
 	pop	psw			;get back extension flag
 	extrn	temp
@@ -937,6 +937,8 @@ prgfil:	mov	e,a			;save file number in [e]
 	mvi	m,'S'			;set ".BAS"
 					;bascom
 prgdot:	pop	h			;[h,l]=pointer at file data block
+	mov	a,d			;5.21: save mode
+	push	psw			;5.21: save on stack
 	shld	ptrfil##		;setup as current file
 	push	h			;save back file data block pointer
 	inx	h			;point to fcb entry
@@ -954,17 +956,19 @@ opnlp:	ldax	d			;get byte from filnam
 ;	((sp)) points to file data block
 ;	((sp)+2) contains the file mode - dmc!x3200!r2e
 
-	mvi	m,0			;make sure extent field is zero
+	xra	a			;5.21: clear A first
+	mov	m,a			;make sure extent field is zero
 	lxi	d,0+20			;point to nr field
 	dad	d
-	mvi	m,0			;set to zero
+	mov	m,a			;set to zero (A already 0)
 	pop	d			;get pointer to file data block back in [d]
 	push	d			;save again for later
 	inx	d
 	call	setbuf			;set buffer address
 	pop	h			;get back file data block ptr
+	pop	psw			;5.21: get mode from stack
+	push	psw			;5.21: save it back
 	push	h			;save back
-	mov	a,m			;get mode
 	cpi	md.sqo			;seqential output?
 	jnz	opnfil			;no, do cpm open call
 	push	d			;save fcb pointer
@@ -981,8 +985,9 @@ opnfil:	mvi	c,c.open		;cpm code for open
 	inr	a			;file not found
 	jnz	opnset			;found
 	pop	d			;get back file pointer
+	pop	psw			;5.21: get mode from stack
+	push	psw			;5.21: save it back
 	push	d			;save back
-	ldax	d			;get mode of file
 	cpi	md.rnd			;random?
 	jnz	derfnf			;no, seqential input, file not found
 	inx	d			;make [d,e]=fcb pointer
@@ -992,6 +997,8 @@ opnfil:	mvi	c,c.open		;cpm code for open
 ;	((sp)+2) contains the file mode - dmc!x3200!r2e
 
 opnset:	pop	d			;point to file info
+	pop	psw			;5.21: get mode from stack
+	stax	d			;5.21: store mode in file block
 	push	d			;save pointer back
 	lxi	h,0+locofs		;point to curloc
 	dad	d
@@ -1073,8 +1080,9 @@ kill::
 	push	d			;save back
 	push	psw			;save found flag
 	mvi	c,c.clos		;this may not be nesc.
-	cnz	cpment			;close file
-	pop	psw			;restore found indicator
+	jz	kilpop			;5.21: skip close if not found
+	call	cpment			;close file
+kilpop:	pop	psw			;restore found indicator
 	pop	d			;restore fcb pointer
 	jz	derfnf			;yes
 	mvi	c,c.dele		;code for delete

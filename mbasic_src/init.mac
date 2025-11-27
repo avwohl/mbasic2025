@@ -93,9 +93,16 @@ init:
 	sta	proflg
 	extrn	topmem,fretop
 	shld	topmem
+	sphl				;5.21: set stack to topmem
+	lxi	h,cpmwri+1		;5.21: point past cpmwri
+	mvi	m,':'			;5.21: store terminator
+	extrn	stkini
+	call	stkini			;5.21: initialize stack
+	extrn	ttypos
+	sta	ttypos			;5.21: A is still 0
 	extrn	savstk
 	shld	savstk			;we restore stack when errors
-	lhld	cpmwrm+1		;get start of bios vector table
+	lhld	1			;5.21: get BDOS address
 	lxi	b,0+4			;csts
 	dad	b			;add four
 	mov	e,m			;pick up csts address
