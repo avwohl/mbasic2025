@@ -650,20 +650,15 @@ alptab:
 reslst:
 
 atab:
-	db	'UT'
-	db	'O' or 128
+	dc	'UTO'
 	db	$auto
-	db	'N'
-	db	'D' or 128
+	dc	'ND'
 	db	$and
-	db	'B'
-	db	'S' or 128
+	dc	'BS'
 	db	$abs-128
-	db	'T'
-	db	'N' or 128
+	dc	'TN'
 	db	$atn-128
-	db	'S'
-	db	'C' or 128
+	dc	'SC'
 	db	$asc-128
 	db	0
 
@@ -671,131 +666,94 @@ btab:
 	db	0
 
 ctab:
-	db	'LOS'
-	db	'E' or 128
+	dc	'LOSE'
 	db	$close
-	db	'ON'
-	db	'T' or 128
+	dc	'ONT'
 	db	$cont
-	db	'LEA'
-	db	'R' or 128
+	dc	'LEAR'
 	db	$clear
-	db	'IN'
-	db	'T' or 128
+	dc	'INT'
 	db	$cint-128
-	db	'SN'
-	db	'G' or 128
+	dc	'SNG'
 	db	$csng-128
-	db	'DB'
-	db	'L' or 128
+	dc	'DBL'
 	db	$cdbl-128
-	db	'V'
-	db	'I' or 128
+	dc	'VI'
 	db	$cvi-128
-	db	'V'
-	db	'S' or 128
+	dc	'VS'
 	db	$cvs-128
-	db	'V'
-	db	'D' or 128
+	dc	'VD'
 	db	$cvd-128
-	db	'O'
-	db	'S' or 128
+	dc	'OS'
 	db	$cos-128
-	db	'HR'
-	db	'$' or 128
+	dc	'HR$'
 	db	$chr$-128
-	db	'AL'
-	db	'L' or 128
+	dc	'ALL'
 	db	$call
-	db	'OMMO'
-	db	'N' or 128
+	dc	'OMMON'
 	db	$commo
-	db	'HAI'
-	db	'N' or 128
+	dc	'HAIN'
 	db	$chain
 	db	0
 
 dtab:
 
-	db	'ELET'
-	db	'E' or 128
+	dc	'ELETE'
 	db	$delet
-	db	'AT'
-	db	'A' or 128
+	dc	'ATA'
 	db	$data
-	db	'I'
-	db	'M' or 128
+	dc	'IM'
 	db	$dim
-	db	'EFST'
-	db	'R' or 128
+	dc	'EFSTR'
 	db	$defst
-	db	'EFIN'
-	db	'T' or 128
+	dc	'EFINT'
 	db	$defin
-	db	'EFSN'
-	db	'G' or 128
+	dc	'EFSNG'
 	db	$defsn
-	db	'EFDB'
-	db	'L' or 128
+	dc	'EFDBL'
 	db	$defdb
-	db	'E'
-	db	'F' or 128
+	dc	'EF'
 	db	$def
 
 
 	db	0
 
 etab:
-	db	'LS'
-	db	'E' or 128
+	dc	'LSE'
 	db	$else
-	db	'N'
-	db	'D' or 128
+	dc	'ND'
 	db	$end
-	db	'RAS'
-	db	'E' or 128
+	dc	'RASE'
 	db	$erase
-	db	'DI'
-	db	'T' or 128
+	dc	'DIT'
 	db	$edit
-	db	'RRO'
-	db	'R' or 128
+	dc	'RROR'
 	db	$error
-	db	'R'
-	db	'L' or 128
+	dc	'RL'
 	db	$erl
-	db	'R'
-	db	'R' or 128
+	dc	'RR'
 	db	$err
-	db	'X'
-	db	'P' or 128
+	dc	'XP'
 	db	$exp-128
-	db	'O'
-	db	'F' or 128
+	dc	'OF'
 	db	$eof-128
-	db	'Q'
-	db	'V' or 128
+	dc	'QV'
 	db	$eqv
 	db	0
 
 ftab:
-	db	'O'
-	db	'R' or 128
+	dc	'OR'
 	db	$for
-	db	'IEL'
-	db	'D' or 128
+	dc	'IELD'
 	db	$field
-	db	'ILE'
-	db	'S' or 128
+	dc	'ILES'
 	db	$files
 	db	''
 	db	'N' or 128
 	db	$fn
-	db	'R'
-	db	'E' or 128
+	dc	'RE'
 	db	$fre-128
-	db	'I'
-	db	'X' or 128
+	dc	'IX'
 	db	$fix-128
 
 
@@ -803,49 +761,39 @@ ftab:
 	db	0
 
 gtab:
-	db	'OT'
-	db	'O' or 128
+	dc	'OTO'
 	db	$goto
 	db	'O'
 	db	' '
 	db	'T'
 	db	'O'+128
 	db	$goto
-	db	'OSU'
-	db	'B' or 128
+	dc	'OSUB'
 	db	$gosub
-	db	'E'
-	db	'T' or 128
+	dc	'ET'
 	db	$get
 	db	0
 
 htab:
-	db	'EX'
-	db	'$' or 128
+	dc	'EX$'
 	db	$hex$-128
 	db	0
 
 itab:
-	db	'NPU'
-	db	'T' or 128
+	dc	'NPUT'
 	db	$input
 	db	''
 	db	'F' or 128
 	db	$if
-	db	'NST'
-	db	'R' or 128
+	dc	'NSTR'
 	db	$instr
-	db	'N'
-	db	'T' or 128
+	dc	'NT'
 	db	$int-128
-	db	'N'
-	db	'P' or 128
+	dc	'NP'
 	db	$inp-128
-	db	'M'
-	db	'P' or 128
+	dc	'MP'
 	db	$imp
-	db	'NKEY'
-	db	'$' or 128
+	dc	'NKEY$'
 	db	$inkey
 	db	0
 
@@ -853,98 +801,71 @@ jtab:
 	db	0
 
 ktab:
-	db	'IL'
-	db	'L' or 128
+	dc	'ILL'
 	db	$kill
 	db	0
 
 ltab:
-	db	'PRIN'
-	db	'T' or 128
+	dc	'PRINT'
 	db	$lprin
-	db	'LIS'
-	db	'T' or 128
+	dc	'LIST'
 	db	$llist
-	db	'PO'
-	db	'S' or 128
+	dc	'POS'
 	db	$lpos-128
-	db	'E'
-	db	'T' or 128
+	dc	'ET'
 	db	$let
-	db	'IN'
-	db	'E' or 128
+	dc	'INE'
 	db	$line
-	db	'OA'
-	db	'D' or 128
+	dc	'OAD'
 	db	$load
-	db	'SE'
-	db	'T' or 128
+	dc	'SET'
 	db	$lset
-	db	'IS'
-	db	'T' or 128
+	dc	'IST'
 	db	$list
-	db	'O'
-	db	'G' or 128
+	dc	'OG'
 	db	$log-128
-	db	'O'
-	db	'C' or 128
+	dc	'OC'
 	db	$loc-128
-	db	'E'
-	db	'N' or 128
+	dc	'EN'
 	db	$len-128
-	db	'EFT'
-	db	'$' or 128
+	dc	'EFT$'
 	db	$left$-128
-	db	'O'
-	db	'F' or 128
+	dc	'OF'
 	db	$lof-128
 	db	0
 
 mtab:
-	db	'ERG'
-	db	'E' or 128
+	dc	'ERGE'
 	db	$merge
-	db	'O'
-	db	'D' or 128
+	dc	'OD'
 	db	$mod
-	db	'KI'
-	db	'$' or 128
+	dc	'KI$'
 	db	$mki$-128
-	db	'KS'
-	db	'$' or 128
+	dc	'KS$'
 	db	$mks$-128
-	db	'KD'
-	db	'$' or 128
+	dc	'KD$'
 	db	$mkd$-128
-	db	'ID'
-	db	'$' or 128
+	dc	'ID$'
 	db	$mid$-128
 	db	0
 
 ntab:
-	db	'EX'
-	db	'T' or 128
+	dc	'EXT'
 	db	$next
-	db	'UL'
-	db	'L' or 128
+	dc	'ULL'
 	db	$null
-	db	'AM'
-	db	'E' or 128
+	dc	'AME'
 	db	$name
-	db	'E'
-	db	'W' or 128
+	dc	'EW'
 	db	$new
-	db	'O'
-	db	'T' or 128
+	dc	'OT'
 	db	$not
 	db	0
 
 otab:
-	db	'PE'
-	db	'N' or 128
+	dc	'PEN'
 	db	$open
-	db	'U'
-	db	'T' or 128
+	dc	'UT'
 	db	$out
 	db	''
 	db	'N' or 128
@@ -952,125 +873,92 @@ otab:
 	db	''
 	db	'R' or 128
 	db	$or
-	db	'CT'
-	db	'$' or 128
+	dc	'CT$'
 	db	$oct$-128
 
-	db	'PTIO'
-	db	'N' or 128
+	dc	'PTION'
 	db	$optio
 
 	db	0
 
 ptab:
-	db	'RIN'
-	db	'T' or 128
+	dc	'RINT'
 	db	$print
-	db	'U'
-	db	'T' or 128
+	dc	'UT'
 	db	$put
-	db	'OK'
-	db	'E' or 128
+	dc	'OKE'
 	db	$poke
-	db	'O'
-	db	'S' or 128
+	dc	'OS'
 	db	$pos-128
-	db	'EE'
-	db	'K' or 128
+	dc	'EEK'
 	db	$peek-128
 	db	0
 qtab:
 	db	0
 
 rtab:
-	db	'ETUR'
-	db	'N' or 128
+	dc	'ETURN'
 	db	$retur
-	db	'EA'
-	db	'D' or 128
+	dc	'EAD'
 	db	$read
-	db	'U'
-	db	'N' or 128
+	dc	'UN'
 	db	$run
-	db	'ESTOR'
-	db	'E' or 128
+	dc	'ESTORE'
 	db	$resto
-	db	'E'
-	db	'M' or 128
+	dc	'EM'
 	db	$rem
-	db	'ESUM'
-	db	'E' or 128
+	dc	'ESUME'
 	db	$resum
-	db	'SE'
-	db	'T' or 128
+	dc	'SET'
 	db	$rset
-	db	'IGHT'
-	db	'$' or 128
+	dc	'IGHT$'
 	db	$right-128
-	db	'N'
-	db	'D' or 128
+	dc	'ND'
 	db	$rnd-128
-	db	'ENU'
-	db	'M' or 128
+	dc	'ENUM'
 	db	$renum
-	db	'ESE'
-	db	'T' or 128
+	dc	'ESET'
 	db	$reset
-	db	'ANDOMIZ'
-	db	'E' or 128
+	dc	'ANDOMIZE'
 	db	$rando
 	db	0
 
 stab:
-	db	'TO'
-	db	'P' or 128
+	dc	'TOP'
 	db	$stop
-	db	'WA'
-	db	'P' or 128
+	dc	'WAP'
 	db	$swap
-	db	'AV'
-	db	'E' or 128
+	dc	'AVE'
 	db	$save
 	db	'P'
 	db	'C'
 	db	'('+128
 	db	spctk
-	db	'TE'
-	db	'P' or 128
+	dc	'TEP'
 	db	$step
-	db	'G'
-	db	'N' or 128
+	dc	'GN'
 	db	$sgn-128
-	db	'Q'
-	db	'R' or 128
+	dc	'QR'
 	db	$sqr-128
-	db	'I'
-	db	'N' or 128
+	dc	'IN'
 	db	$sin-128
-	db	'TR'
-	db	'$' or 128
+	dc	'TR$'
 	db	$str$-128
-	db	'TRING'
-	db	'$' or 128
+	dc	'TRING$'
 	db	$strin
-	db	'PACE'
-	db	'$' or 128
+	dc	'PACE$'
 	db	$space-128
 
-	db	'YSTE'
-	db	'M' or 128
+	dc	'YSTEM'
 	db	$syste
 	db	0
 
 ttab:
-	db	'HE'
-	db	'N' or 128
+	dc	'HEN'
 	db	$then
-	db	'RO'
-	db	'N' or 128
+	dc	'RON'
 	db	$tron
-	db	'ROF'
-	db	'F' or 128
+	dc	'ROFF'
 	db	$troff
 	db	'A'
 	db	'B'
@@ -1079,50 +967,39 @@ ttab:
 	db	''
 	db	'O' or 128
 	db	$to
-	db	'A'
-	db	'N' or 128
+	dc	'AN'
 	db	$tan-128
 	db	0
 
 utab:
-	db	'SIN'
-	db	'G' or 128
+	dc	'SING'
 	db	$using
-	db	'S'
-	db	'R' or 128
+	dc	'SR'
 	db	$usr
 	db	0
 
 vtab:
-	db	'A'
-	db	'L' or 128
+	dc	'AL'
 	db	$val-128
-	db	'ARPT'
-	db	'R' or 128
+	dc	'ARPTR'
 	db	$varpt
 	db	0
 
 wtab:
-	db	'IDT'
-	db	'H' or 128
+	dc	'IDTH'
 	db	$width
-	db	'AI'
-	db	'T' or 128
+	dc	'AIT'
 	db	$wait
-	db	'HIL'
-	db	'E' or 128
+	dc	'HILE'
 	db	$while
-	db	'EN'
-	db	'D' or 128
+	dc	'END'
 	db	$wend
-	db	'RIT'
-	db	'E' or 128
+	dc	'RITE'
 	db	$write
 	db	0
 
 xtab:
-	db	'O'
-	db	'R' or 128
+	dc	'OR'
 	db	$xor
 	db	0
 ytab:
@@ -1664,6 +1541,399 @@ brktxt:	dc	'Break'
 ; find a "FOR" entry on the stack with the variable pointer
 ; passed in [d,e].
 ;
+
+;======================================================================
+; Moved Data Constants
+;======================================================================
+
+gostr:	db	'GO ',0
+tostr:	db	'TO',0
+ubstr:	db	'UB',0
+
+;======================================================================
+; Floating Point Constants (moved from f4.mac for relative jump range)
+;======================================================================
+
+fone:	db	000 ; 1
+	db	000
+	db	000
+	db	201o
+logp:	db	004 ;hart 2524 coefficients
+	db	232o ;4.8114746
+	db	367o
+	db	031o
+	db	203o
+	db	044o ;6.105852
+	db	143o
+	db	103o
+	db	203o
+	db	165o ;-8.86266
+	db	315o
+	db	215o
+	db	204o
+	db	251o ;-2.054667
+	db	177o
+	db	203o
+	db	202o
+logq:	db	004
+	db	000 ;1.0
+	db	000
+	db	000
+	db	201o
+	db	342o ;6.427842
+	db	260o
+	db	115o
+	db	203o
+	db	012o ;4.545171
+	db	162o
+	db	021o
+	db	203o
+	db	364o ;.3535534
+	db	004
+	db	065o
+	db	177o
+
+log:	CALL sign ;check for a negative or zero argument
+tenth:	db	315o
+	db	314o
+	db	314o
+	db	314o
+	db	314o
+	db	314o
+	db	114o
+	db	175o
+dten:	db	000 ; 10d0
+	db	000
+	db	000
+	db	000
+ften:	db	000 ; 10.0
+	db	000
+	db	040o
+	db	204o
+
+					;double precision divide fac by 10
+					;alters all registers
+ddiv10:;double precision divide fac by 10
+					;(fac)=(fac)*3/4*16/15*1/8
+infp:	db	377o
+	db	377o
+	db	177o
+	db	377o
+infm:	db	377o
+	db	377o
+	db	377o
+	db	377o
+;intdv0 removed - 5.21 doesn't have this routine
+
+	subttl	floating point output routine
+tenten:	db	0 ;10000000000
+	db	0
+	db	0
+	db	0
+	db	371o
+	db	2
+	db	25o
+	db	242o
+foutdl:	db	341o ; 999,999,999,999,999.5
+	db	377o
+	db	237o
+	db	061o
+	db	251o
+	db	137o
+	db	143o
+	db	262o
+foutdu:	db	376o ; 9,999,999,999,999,999.5
+	db	377o
+	db	003
+	db	277o
+	db	311o
+	db	033o
+	db	016o
+	db	266o
+dhalf:	db	000 ; .5d0
+	db	000
+	db	000
+	db	000
+fhalf:	db	000 ; .5e0
+	db	000
+	db	000
+	db	200o
+ffxdxm:	db	000 ; 1d16
+	db	000
+	db	004
+	db	277o
+	db	311o
+	db	033o
+	db	016o
+	db	266o
+					;double precision power of ten table
+fodtbl:	db	000 ; 1d15
+	db	200o
+	db	306o
+	db	244o
+	db	176o
+	db	215o
+	db	003
+	db	000 ; 1d14
+	db	100o
+	db	172o
+	db	020o
+	db	363o
+	db	132o
+	db	000
+	db	000 ; 1d13
+	db	240o
+	db	162o
+	db	116o
+	db	030o
+	db	011o
+	db	000
+	db	000 ; 1d12
+	db	020o
+	db	245o
+	db	324o
+	db	350o
+	db	000
+	db	000
+	db	000 ; 1d11
+	db	350o
+	db	166o
+	db	110o
+	db	027o
+	db	000
+	db	000
+	db	000 ; 1d10
+	db	344o
+	db	013o
+	db	124o
+	db	002
+	db	000
+	db	000
+	db	000 ; 1d9
+	db	312o
+	db	232o
+	db	073o
+	db	000
+	db	000
+	db	000
+	db	000 ; 1d8
+	db	341o
+	db	365o
+	db	005
+	db	000
+	db	000
+	db	000
+	db	200o ; 1d7
+	db	226o
+	db	230o
+	db	000
+	db	000
+	db	000
+	db	000
+	db	100o ; 1d6
+	db	102o
+	db	017o
+	db	000
+	db	000
+	db	000
+	db	000
+					;single precision power of ten table
+fostbl:	db	240o ; 1e5
+	db	206o
+	db	001
+	db	020o ; 1e4
+	db	047o
+	db	000
+					;integer power of ten table
+foitbl:	db	020o ; 10000
+	db	047o
+	db	350o ; 1000
+	db	003
+	db	144o ; 100
+	db	000
+	db	012o ; 10
+	db	000
+	db	001 ; 1
+	db	000
+;
+; output routines for octal and hex numbers
+;
+fouto:	XOR A ;make a=0, set zero
+expbcn:	db	7 ;degree + 1
+	db	174o ;.00020745577403-
+	db	210o
+	db	131o
+	db	164o
+	db	340o ;.00127100574569-
+	db	227o
+	db	046o
+	db	167o
+	db	304o ;.00965065093202+
+	db	035o
+	db	036o
+	db	172o
+	db	136o ;.05549656508324+
+	db	120o
+	db	143o
+	db	174o
+	db	032o ;.24022713817633-
+	db	376o
+	db	165o
+	db	176o
+	db	030o ;.69314717213716+
+	db	162o
+	db	061o
+	db	200o
+	db	000 ;1.0
+	db	0000
+	db	0000
+	db	201o
+					;end intfsw conditional
+
+	subttl	polynomial evaluator and the random number generator
+rndcm:	db	0 ;5.21: rndcnt-1
+rndcnt:	db	0
+	db	0
+rndtab:	db	65o
+	db	112o
+	db	312o
+	db	231o
+	db	71o
+	db	34o
+	db	166o
+	db	230o
+	db	42o
+	db	225o
+	db	263o
+	db	230o
+	db	12o
+	db	335o
+	db	107o
+	db	230o
+	db	123o
+	db	321o
+	db	231o
+	db	231o
+	db	012o
+	db	032o
+	db	237o
+	db	230o
+	db	145o
+	db	274o
+	db	315o
+	db	230o
+	db	326o
+	db	167o
+	db	076o
+	db	230o
+rndx:	db	122o ;last random number generated, between 0 and 1
+	db	307o
+	db	117o
+	db	200o
+rndtb2:	db	150o
+	db	261o
+	db	106o
+	db	150o
+	db	231o
+	db	351o
+	db	222o
+	db	151o
+	db	020o
+	db	321o
+	db	165o
+	db	150o
+	subttl	sine, cosine and tangent functions
+p1b2pi:	db	000 ;1/(2*pi)
+	db	000
+	db	000
+	db	000
+	db	203o
+	db	371o
+	db	042o
+	db	176o
+pi2:	db	333o ; pi/2
+	db	017o
+	db	111o
+	db	201o
+fr4:	db	000 ; 1/4
+	db	000
+	db	000
+	db	177o
+sincon:;hart algorithm 3341 constants
+;note that hart constants have been scaled by a power of 2
+;this is due to range reduction as a % of 2*pi rather than pi/2
+;would need to multiply argument by 4 but instead we factor this
+;thru the constants.
+	db	5 ;degree
+	db	373o ; .1514851e-3
+	db	327o
+	db	036o
+	db	206o
+	db	145o ; -.4673767e-2
+	db	046o
+	db	231o
+	db	207o
+	db	130o ; .7968968e-1
+	db	064o
+	db	043o
+	db	207o
+	db	341o ; -.6459637
+	db	135o
+	db	245o
+	db	206o
+	db	333o ; 1.570796
+	db	017o
+	db	111o
+	db	203o
+
+					;tangent function
+					;tan(x)=sin(x)/cos(x)
+tan:	CALL pushf ;save arg
+atncon:	db	11o ;degree
+	db	112o ; .002866226
+	db	327o
+	db	073o
+	db	170o
+	db	002 ; -.01616574
+	db	156o
+	db	204o
+	db	173o
+	db	376o ; .04290961
+	db	301o
+	db	057o
+	db	174o
+	db	164o ; -.07528964
+	db	061o
+	db	232o
+	db	175o
+	db	204o ; .1065626
+	db	075o
+	db	132o
+	db	175o
+	db	310o ; -.142089
+	db	177o
+	db	221o
+	db	176o
+	db	344o ; .1999355
+	db	273o
+	db	114o
+	db	176o
+	db	154o ; -.3333315
+	db	252o
+	db	252o
+	db	177o
+	db	000 ; 1.0
+	db	000
+	db	000
+	db	201o
+
+
+;======================================================================
+; Module: biptrg.mac
+;======================================================================
+
+	title	biptrg	basic interpreter pointer get routines/whg/pga
+
 fndfor:	LD HL,4+0 ;ignoring everyones "NEWSTT"
 					;and the return address of this
 	ADD HL,SP ;subroutine, set [h,l]=sp
@@ -2255,10 +2525,6 @@ gostrcm:	LD A,(DE) ;get string char
 	INC DE ;advance string
 	JP gostrcm ;loop
 ;
-gostr:	db	'GO ',0
-tostr:	db	'TO',0
-ubstr:	db	'UB',0
-
 notgos:	POP HL
 	CALL makupl ;get back the character
 	PUSH HL ;resave the text pointer
@@ -6351,46 +6617,6 @@ shftc:	LD A,D ;shift next byte right
 					;an approximation polynomial is used to calculate log2(f)
 
 					;constants used by log
-fone:	db	000 ; 1
-	db	000
-	db	000
-	db	201o
-logp:	db	004 ;hart 2524 coefficients
-	db	232o ;4.8114746
-	db	367o
-	db	031o
-	db	203o
-	db	044o ;6.105852
-	db	143o
-	db	103o
-	db	203o
-	db	165o ;-8.86266
-	db	315o
-	db	215o
-	db	204o
-	db	251o ;-2.054667
-	db	177o
-	db	203o
-	db	202o
-logq:	db	004
-	db	000 ;1.0
-	db	000
-	db	000
-	db	201o
-	db	342o ;6.427842
-	db	260o
-	db	115o
-	db	203o
-	db	012o ;4.545171
-	db	162o
-	db	021o
-	db	203o
-	db	364o ;.3535534
-	db	004
-	db	065o
-	db	177o
-
-log:	CALL sign ;check for a negative or zero argument
 	OR A ;set cc'S PROPERLY
 	JP PE,fcerr ;fac .le. 0, blow him out of the water
 					;fsign only returns 0,1 or 377 in a
@@ -7881,27 +8107,6 @@ dmult5:	LD HL,facs ;get pointer to ho of fac
 	JP dmult4 ; multiplyiing by zero
 
 					;constant for div10, ddiv10
-tenth:	db	315o
-	db	314o
-	db	314o
-	db	314o
-	db	314o
-	db	314o
-	db	114o
-	db	175o
-dten:	db	000 ; 10d0
-	db	000
-	db	000
-	db	000
-ften:	db	000 ; 10.0
-	db	000
-	db	040o
-	db	204o
-
-					;double precision divide fac by 10
-					;alters all registers
-ddiv10:;double precision divide fac by 10
-					;(fac)=(fac)*3/4*16/15*1/8
 	LD A,(fac) ;must assure ourselves we can do
 	CP 101o ;65 exponent decrements w/o 
 	JP NC,dd04 ;reaching zero
@@ -8435,17 +8640,6 @@ noodtp:
 	POP BC
 	POP HL
 	RET
-infp:	db	377o
-	db	377o
-	db	177o
-	db	377o
-infm:	db	377o
-	db	377o
-	db	377o
-	db	377o
-;intdv0 removed - 5.21 doesn't have this routine
-
-	subttl	floating point output routine
 					;entry to linprt
 inprt:	PUSH HL ;save line number
 	LD HL,intxt ;print message
@@ -9453,139 +9647,6 @@ fouci2:	INC B ;increment the digit count
 
 
 					;constants used by fout
-tenten:	db	0 ;10000000000
-	db	0
-	db	0
-	db	0
-	db	371o
-	db	2
-	db	25o
-	db	242o
-foutdl:	db	341o ; 999,999,999,999,999.5
-	db	377o
-	db	237o
-	db	061o
-	db	251o
-	db	137o
-	db	143o
-	db	262o
-foutdu:	db	376o ; 9,999,999,999,999,999.5
-	db	377o
-	db	003
-	db	277o
-	db	311o
-	db	033o
-	db	016o
-	db	266o
-dhalf:	db	000 ; .5d0
-	db	000
-	db	000
-	db	000
-fhalf:	db	000 ; .5e0
-	db	000
-	db	000
-	db	200o
-ffxdxm:	db	000 ; 1d16
-	db	000
-	db	004
-	db	277o
-	db	311o
-	db	033o
-	db	016o
-	db	266o
-					;double precision power of ten table
-fodtbl:	db	000 ; 1d15
-	db	200o
-	db	306o
-	db	244o
-	db	176o
-	db	215o
-	db	003
-	db	000 ; 1d14
-	db	100o
-	db	172o
-	db	020o
-	db	363o
-	db	132o
-	db	000
-	db	000 ; 1d13
-	db	240o
-	db	162o
-	db	116o
-	db	030o
-	db	011o
-	db	000
-	db	000 ; 1d12
-	db	020o
-	db	245o
-	db	324o
-	db	350o
-	db	000
-	db	000
-	db	000 ; 1d11
-	db	350o
-	db	166o
-	db	110o
-	db	027o
-	db	000
-	db	000
-	db	000 ; 1d10
-	db	344o
-	db	013o
-	db	124o
-	db	002
-	db	000
-	db	000
-	db	000 ; 1d9
-	db	312o
-	db	232o
-	db	073o
-	db	000
-	db	000
-	db	000
-	db	000 ; 1d8
-	db	341o
-	db	365o
-	db	005
-	db	000
-	db	000
-	db	000
-	db	200o ; 1d7
-	db	226o
-	db	230o
-	db	000
-	db	000
-	db	000
-	db	000
-	db	100o ; 1d6
-	db	102o
-	db	017o
-	db	000
-	db	000
-	db	000
-	db	000
-					;single precision power of ten table
-fostbl:	db	240o ; 1e5
-	db	206o
-	db	001
-	db	020o ; 1e4
-	db	047o
-	db	000
-					;integer power of ten table
-foitbl:	db	020o ; 10000
-	db	047o
-	db	350o ; 1000
-	db	003
-	db	144o ; 100
-	db	000
-	db	012o ; 10
-	db	000
-	db	001 ; 1
-	db	000
-;
-; output routines for octal and hex numbers
-;
-fouto:	XOR A ;make a=0, set zero
 	LD B,A ;save in [b]
 	db	302o ;"JNZ" around next two bytes
 fouth:	LD B,1 ;set hex flag
@@ -9787,38 +9848,6 @@ exp200:	LD BC,201q*256+000q
 ;*************************************************************
 ;	hart 1302 polynomial coefficients
 ;*************************************************************
-expbcn:	db	7 ;degree + 1
-	db	174o ;.00020745577403-
-	db	210o
-	db	131o
-	db	164o
-	db	340o ;.00127100574569-
-	db	227o
-	db	046o
-	db	167o
-	db	304o ;.00965065093202+
-	db	035o
-	db	036o
-	db	172o
-	db	136o ;.05549656508324+
-	db	120o
-	db	143o
-	db	174o
-	db	032o ;.24022713817633-
-	db	376o
-	db	165o
-	db	176o
-	db	030o ;.69314717213716+
-	db	162o
-	db	061o
-	db	200o
-	db	000 ;1.0
-	db	0000
-	db	0000
-	db	201o
-					;end intfsw conditional
-
-	subttl	polynomial evaluator and the random number generator
 					;evaluate p(x^2)*x
 					;pointer to degree+1 is in (hl)
 					;the constants follow the degree
@@ -9950,58 +9979,6 @@ rndstr:	LD (HL),A ;zero the counters
 	JP rnd1
 
 					;storage for rnd
-rndcm:	db	0 ;5.21: rndcnt-1
-rndcnt:	db	0
-	db	0
-rndtab:	db	65o
-	db	112o
-	db	312o
-	db	231o
-	db	71o
-	db	34o
-	db	166o
-	db	230o
-	db	42o
-	db	225o
-	db	263o
-	db	230o
-	db	12o
-	db	335o
-	db	107o
-	db	230o
-	db	123o
-	db	321o
-	db	231o
-	db	231o
-	db	012o
-	db	032o
-	db	237o
-	db	230o
-	db	145o
-	db	274o
-	db	315o
-	db	230o
-	db	326o
-	db	167o
-	db	076o
-	db	230o
-rndx:	db	122o ;last random number generated, between 0 and 1
-	db	307o
-	db	117o
-	db	200o
-rndtb2:	db	150o
-	db	261o
-	db	106o
-	db	150o
-	db	231o
-	db	351o
-	db	222o
-	db	151o
-	db	020o
-	db	321o
-	db	165o
-	db	150o
-	subttl	sine, cosine and tangent functions
 					;cosine function
 					;idea:  use cos(x)=sin(x+pi/2)
 bobtst	set	0
@@ -10075,52 +10052,6 @@ sin3:	LD HL,sincon ;point to hart coefficients
 					;end of intfsw cond
 
 					;constants for sin, cos
-p1b2pi:	db	000 ;1/(2*pi)
-	db	000
-	db	000
-	db	000
-	db	203o
-	db	371o
-	db	042o
-	db	176o
-pi2:	db	333o ; pi/2
-	db	017o
-	db	111o
-	db	201o
-fr4:	db	000 ; 1/4
-	db	000
-	db	000
-	db	177o
-sincon:;hart algorithm 3341 constants
-;note that hart constants have been scaled by a power of 2
-;this is due to range reduction as a % of 2*pi rather than pi/2
-;would need to multiply argument by 4 but instead we factor this
-;thru the constants.
-	db	5 ;degree
-	db	373o ; .1514851e-3
-	db	327o
-	db	036o
-	db	206o
-	db	145o ; -.4673767e-2
-	db	046o
-	db	231o
-	db	207o
-	db	130o ; .7968968e-1
-	db	064o
-	db	043o
-	db	207o
-	db	341o ; -.6459637
-	db	135o
-	db	245o
-	db	206o
-	db	333o ; 1.570796
-	db	017o
-	db	111o
-	db	203o
-
-					;tangent function
-					;tan(x)=sin(x)/cos(x)
-tan:	CALL pushf ;save arg
 	CALL sin ;   tan(x)=sin(x)/cos(x)
 	POP BC ;get x off stack
 	POP HL ;pushf smashes (de)
@@ -10151,50 +10082,6 @@ atn2:	LD HL,atncon ;evaluate approximation polynomial
 	RET ; subtract the result from pi/2
 
 					;constants for atn
-atncon:	db	11o ;degree
-	db	112o ; .002866226
-	db	327o
-	db	073o
-	db	170o
-	db	002 ; -.01616574
-	db	156o
-	db	204o
-	db	173o
-	db	376o ; .04290961
-	db	301o
-	db	057o
-	db	174o
-	db	164o ; -.07528964
-	db	061o
-	db	232o
-	db	175o
-	db	204o ; .1065626
-	db	075o
-	db	132o
-	db	175o
-	db	310o ; -.142089
-	db	177o
-	db	221o
-	db	176o
-	db	344o ; .1999355
-	db	273o
-	db	114o
-	db	176o
-	db	154o ; -.3333315
-	db	252o
-	db	252o
-	db	177o
-	db	000 ; 1.0
-	db	000
-	db	000
-	db	201o
-
-
-;======================================================================
-; Module: biptrg.mac
-;======================================================================
-
-	title	biptrg	basic interpreter pointer get routines/whg/pga
 	subttl	dimension & variable searching - ptrget
 dimcon:	DEC HL ;see if comma ended this variable
 	CALL chrgtr
@@ -17121,8 +17008,8 @@ wass:	CALL chrgtr ;get char after "S"
 	LD (maxrec),HL
 	EX DE,HL
 	JP fok ;continue scanning
-zerob:	db	0 ;zero byte
-comagn:	db	0 ;we havent scanned command yet
+zerob:	db	0			;zero byte
+comagn:	db	0			;we havent scanned command yet
 errcmd:
 doncmd:
 askmem:
