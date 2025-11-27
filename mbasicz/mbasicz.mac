@@ -4,24 +4,6 @@
 
 conto	set	15 ;character to supress output (usually control-o)
 dbltrn	set	0 ;for double precision transcendentals
-	if2
-
-	.printx	/extended/
-
-
-	.printx	/lpt/
-
-	.printx	/cpm disk/
-
-
-	.printx	/z80/
-
-	.printx	/fast/
-
-	.printx	/5.0 features/
-
-	.printx	/ansi compatible/
-	endif
 
 clmwid	set	14 ;make comma columns fourteen characters
 datpsc	set	128 ;number of data bytes in disk sector
@@ -93,9 +75,8 @@ jmpini:	JP init ;init is the intialization routine
 	dw	makint ;turn [h,l] into a value in the fac
 					;set valtyp for integer
 
-	page
 	subttl	rom version initalization, and constants
-	page
+
 	subttl	dispatch tables, reserved word tables
 
 ;define some equivalences in case lptsw & cassw off
@@ -1218,7 +1199,7 @@ intdsp:	dw	iadd ;integer routines
 	dw	imult
 	dw	intdiv
 	dw	icomp
-	page
+
 	subttl	error message table
 
 q	set	-2
@@ -1373,9 +1354,7 @@ q	set	q+1
 errtmf	set	q
 
 lsterr	set	q+1 ;last error used for range checks in len2
-	page
 	subttl	constants for rom basic i/o, rndx, fdiv, usrgo
-	page
 	subttl	low segment -- ram -- ie this stuff is not constant
 ;
 ; this is the "VOLATILE" storage area and none of it
@@ -1666,7 +1645,6 @@ fbufp33:	ds	1 ;5.21: fbuffr+33
 fbufp34:	ds	6 ;5.21: fbuffr+34
 fmltt1:	ds	1 ;5.21: fbuffr+40
 fmltt2:	ds	2 ;5.21: fbuffr+41 (plus padding to 43)
-	page
 	subttl	text constants for print out
 ;
 ; needed for messages in all versions
@@ -1681,7 +1659,6 @@ reddy:
 brktxt:	dc	'Break'
 	db	0
 
-	page
 	subttl	general storage management routines - fndfor, bltu, getstk
 ;
 ; find a "FOR" entry on the stack with the variable pointer
@@ -1730,7 +1707,6 @@ popgof:	LD BC,forszc ;to wipe out a "FOR" entry
 	JP looper ;now pointing to the start of the next
 					;entry. see if its a "FOR" entry
 					;and if the variable matches
-	page
 	subttl	error handling
 ; this routine is called to reset the stack if basic is
 ; externally stopped and then restarted.
@@ -1881,7 +1857,6 @@ errfn1:
 	INC A ;zero says direct mode
 	CALL NZ,inprt ;print line number in [h,l]
 ; now fall into main interpreter loop
-	page
 	subttl	stprdy, ready, main, chead
 ;
 ; for "LIST" command stopping
@@ -2090,7 +2065,6 @@ czlin:	INC HL ;make [h,l] point after text
 	INC HL ;advance pointer
 	LD (HL),D ;2nd byte of fixup
 	JP chead ;keep chaining til done
-	page
 	subttl	scnlin, fndlin - scan line range and find line # in program
 ;
 ; scnlin scans a line range of
@@ -2162,10 +2136,7 @@ loop:
 	CCF ;make carry zero
 	RET NC ;no match return (greater)
 	JP loop ;keep looping
-	page
 	subttl	pre fast crunch - compactification
-	page
-	page
 	subttl	fast crunch - compactification
 ;
 ; all "RESERVED" words are translated into single
@@ -2564,13 +2535,10 @@ baksp:	DEC HL ;point to previous char
 	JP Z,baksp
 	INC HL ;point to char after last non-space
 	RET ;all done.
-	page
-	page
 	subttl	the non-extended "LIST" command
 
 
 
-	page
 	subttl	"FOR" statement
 ;
 ; a "FOR" entry on the stack has the following format:
@@ -2727,7 +2695,6 @@ nxtcon:	LD B,$for ;put a 'FOR' token onto the stack
 	INC SP ;the "TOKEN" only takes one byte of
 					;stack space
 ;	jmp	newstt		;all done
-	page
 	subttl	new statement fetcher
 ;
 ; back here for new statement. character pointed to by [h,l]
@@ -2806,7 +2773,6 @@ gone2:	SUB $end ;"ON ... GOTO" and "ON ... GOSUB" come here
 	EX DE,HL ;restore the text pointer
 ; newstt falls into chrget. this fetches the first char after
 ; the statement token and the chrget'S "RET" DISPATCHES TO STATEMENT
-	page
 	subttl	chrget - the next character scan routine
 chrgtr:	INC HL ;duplication of chrget rst for speed
 chrgt2:	LD A,(HL) ;see chrget rst for explanation
@@ -2936,7 +2902,6 @@ ntline:
 	RET ;5.21: return directly
 confdb:	LD HL,conlo ;get pointer to saved constant area
 	JP vmovfm ;5.21: move into fac (returns via vmovfm)
-	page
 	subttl	defstr, defint, defsng, defdbl, intidx
 defstr:	LD E,3 ;default some letters to string
 	db	1q ;"LXI B," over the next 2 bytes
@@ -2996,7 +2961,6 @@ intid2:	CALL getin2 ;read a formula and get the
 	RET P ;don'T ALLOW NEGATIVE NUMBERS
 fcerr:	LD E,errfc ;too big. function call error
 	JP error
-	page
 	subttl	linspc, linget
 ;
 ; linspc is the same as linget except in allows the
@@ -3059,7 +3023,6 @@ morlin:	CALL chrgtr
 pophsr:	POP AF ;get off terminating digit
 	POP HL ;get back old text pointer
 	RET
-	page
 	subttl	run, goto, gosub, return, data, rem
 run:	JP Z,runc ;no line # argument
 	CP lincon ;line number constant?
@@ -3226,7 +3189,6 @@ remer1:	CALL chrgtr ;get a char
 	ADC D ;carry on if [b] not zero
 	LD D,A ;update [d]
 	JP remer
-	page
 	subttl	"LET"
 
 ; letcon is let entry point with valtyp-3 in [a]
@@ -3302,7 +3264,6 @@ copnum:	CALL vmove ;copy a descriptor or a value
 					;at the loop variable into [d,e]
 	POP HL ;get the text pointer back
 	RET
-	page
 	subttl	on..goto, on error goto code
 
 ongoto:
@@ -3351,7 +3312,6 @@ loopon:	DEC C ;see if enough skips
 					;the current line # we must be the end of the line
 	JP loopon ;continue gobbling line #s
 
-	page
 	subttl	resume, error statement code
 resume:	LD DE,oneflg ;point to flag
 	LD A,(DE) ;get flag
@@ -3396,7 +3356,6 @@ errors:	CALL getbyt ;get the param
 	OR A ;error code 0?
 	JP Z,fcerr ;yes, error in itself
 goerr:	JP error ;force an error
-	page
 	subttl	auto command
 ; the auto [begginning line[,[increment]]]
 ; command is used to automatically generate line numbers
@@ -3431,7 +3390,6 @@ sngau1:	LD A,H ;see if zero
 	LD (autlin),HL ;save in intial line
 	POP BC ;get rid of newstt addr
 	JP main ;jump into main code (for rest see after main:)
-	page
 	subttl	if ... then code
 ifs:	CALL frmevl ;evaluate a formula
 	LD A,(HL) ;get terminating character of formula
@@ -3476,7 +3434,6 @@ skpmrf:	CALL data ;skip a statement
 					;enough
 	JP docond ;found the right "ELSE" -- go execute
 
-	page
 	subttl	print code
 
 lprint:	LD A,1 ;say non zero
@@ -3671,7 +3628,6 @@ finprt:
 	LD (ptrfil),HL ;zero out ptrfil
 	POP HL ;get back the text pointer
 	RET
-	page
 	subttl	line input, input and read code
 line:
 	CALL synchr
@@ -4008,7 +3964,6 @@ nowlin:	CALL chrgtr ;get the statement type
 
 
 
-	page
 
 	subttl	formula evaluation code
 
@@ -4347,7 +4302,6 @@ intdiv:	PUSH HL ;save the right hand argument
 	JP fdivt ;do the division after poping into the
 					;registers the left hand argument
 
-	page
 	subttl	eval - evaluate variable, constant, function call
 eval:
 	CALL chrgtr
@@ -4643,7 +4597,6 @@ minpls:
 	RET Z
 	DEC HL ;check if last character was a digit
 	RET ;return with non-zero set
-	page
 	subttl	more formula evaluation - logical, relational ops
 docmp:	INC A ;setup bits
 	ADC A ;4=less 2=equal 1=greater
@@ -4756,7 +4709,6 @@ noteqv:	LD A,L ;must be "IMP"
 	AND D
 	CPL
 	RET
-	page
 ;
 ; this routine subtracts [d,e] from [h,l]
 ; and floats the result leaving it in fac.
@@ -4781,7 +4733,6 @@ sngflt:	LD L,A ;make [a] an unsigned integer
 	XOR A
 givint:	LD H,A
 	JP makint
-	page
 	subttl	user defined (usr) assembly language function code
 usrfn:	CALL scnusr ;scan the usr#
 	PUSH DE ;save pointer
@@ -4831,7 +4782,6 @@ defusr:	CALL scnusr ;scan the usr name
 	POP HL ;restore text pointer
 	RET ;return to newstt
 
-	page
 	subttl	simple-user-defined-function code
 ;
 ; in the 8k version (see later comment for extended)
@@ -5134,7 +5084,6 @@ getfnm:	CALL synchr
 	LD C,A ;get first character into [c]
 
 	JP ptrgt2
-	page
 	subttl	string functions - left hand side mid$
 ismid$:	CP 377o-$end ;lhs mid$?
 	JP NZ,snerr ;no, error.
@@ -5144,7 +5093,6 @@ ismid$:	CP 377o-$end ;lhs mid$?
 	CP midtk ;is it mid?
 	JP Z,lhsmid ;5.21: yes, go to lhsmid
 	JP snerr ;no, error
-	page
 	subttl	inp, out, wait, console, width
 ;
 ; the following functions allow the 
@@ -5245,11 +5193,9 @@ conint:	CALL intfr2 ;convert the fac to an integer in [d,e]
 	LD A,E ;return the result in [a] and [e]
 	RET
 
-	page
 	subttl	execute basic program on prom
 					;go run it
 
-	page
 	subttl	extended list, delete, llist
 llist:
 
@@ -5594,7 +5540,6 @@ mloop:	LD A,(DE)
 	LD L,C
 	LD (vartab),HL
 	RET
-	page
 	subttl	peek and poke
 ;
 ; note: in the 8k peek only accepts positive numbers up to 32767
@@ -5641,7 +5586,6 @@ frqint:	LD BC,frcint ;return here
 					;make the same for radio shack version
 
 
-	page
 	subttl	renumber
 ; the reseq(uence) command take up to three arguments
 ; reseq [nn[,mm[,inc]]]
@@ -6035,7 +5979,6 @@ clrovc:	PUSH AF ;save everything
 ; Module: f4.mac
 ;======================================================================
 
-	page
 	title	mathpk for basic mcs 8080  gates/allen/davidoff
 	subttl	floating point math package configuration
 
@@ -6112,7 +6055,6 @@ curncy	set	44o ;use dollar sign as default
 ;order byte will be in the higher order register of the register pair, i.e.
 ;the higher order byte will be popped into b, d or h.
 ;%
-	page
 
 	subttl	floating point addition and subtraction
 					;entry to fadd with pointer to arg in (hl)
@@ -6403,7 +6345,6 @@ shftc:	LD A,D ;shift next byte right
 	JP shftr3 ;see if we are done
 
 
-	page
 	subttl	natural log function
 					;calculation is by:
 					; ln(f*2^n)=(n+log2(f))*ln(2)
@@ -6486,7 +6427,6 @@ log2:;use hart 2524 calculation
 					;get eval. back
 	JP fadd
 
-	page
 ;	jmp	fmult		;multiply by ln(2)
 	subttl	floating multiplication and division
 					;multiplication		fac:=arg*fac
@@ -6759,7 +6699,6 @@ mul10:	CALL movrf ;get number in registers
 	INC (HL) ; 2 to get 10 times original number
 	RET NZ ;all done if no overflow
 	JP ovfin3
-	page
 	subttl	sign, sgn, float, neg and abs
 					;put sign of fac in a
 					;alters a only
@@ -6880,7 +6819,6 @@ isign:	LD A,H ;get its sign
 	RET Z ;it is, we are done
 	LD A,H ;it isn'T, SIGN IS THE SIGN OF H
 	JP icomps ;go set a correctly
-	page
 	subttl	floating point movement routines
 					;put fac on stack
 					;alters d,e
@@ -7007,7 +6945,6 @@ vdfacs:	LD DE,faclo ;get first address for int, str, sng
 	RET C ;go move it if we do not have a dbl
 	LD DE,dfaclo ;we do, get lo addr of the dbl number
 	RET ;go do the move
-	page
 	subttl	compare two numbers
 					;compare two single precision numbers
 					;a=1 if arg .lt. fac
@@ -7116,7 +7053,6 @@ dcomp1:	LD A,(DE) ;get a byte from arg
 dcomp:	CALL xdcomp ;compare the two numbers
 	JP NZ,fcomps ;negate the answer, make sure the carry comes
 	RET ; out correct for docmp
-	page
 	subttl	conversion routines between integer, single and double precision
 					;force the fac to be an integer
 					;alters a,b,c,d,e,h,l
@@ -7250,7 +7186,6 @@ frcstr:	CALL getypr ;see what kind of value we have
 	RET Z ;we have a string, everything is ok
 	JP tmerr ;we don'T HAVE A STRING, FALL INTO TMERR
 
-	page
 	subttl	greatest integer function
 					;quick greatest integer function
 					;leaves int(fac) in c,d,e (signed)
@@ -7400,7 +7335,6 @@ dinta1:	LD A,(HL) ;get a byte of fac
 	INC HL ;increment pointer to next byte
 	JP Z,dinta1 ;continue if necessary
 	RET ;all done
-	page
 	subttl	integer arithmetic routines
 					;integer multiply for multiply dimensioned arrays
 					; (de):=(bc)*(de)
@@ -7646,7 +7580,6 @@ imod:	PUSH DE ;save (de) for its sign
 					; the division was 32768
 	POP AF ;get the sign of the remainder back
 	JP inega ;negate the remainder if necessary
-	page
 
 	subttl	double precision arithmetic routines
 ;
@@ -8134,7 +8067,6 @@ dmul10:	CALL vmovaf ;save the fac in arg
 	RET NZ ;all done if overflow did not occur
 	JP ovfin4
 					;multiply fac by 10
-	page
 	subttl	floating point input routine
 					;alters all registers
 					;the number is left in fac
@@ -8513,7 +8445,6 @@ infm:	db	377o
 	db	377o
 ;intdv0 removed - 5.21 doesn't have this routine
 
-	page
 	subttl	floating point output routine
 					;entry to linprt
 inprt:	PUSH HL ;save line number
@@ -8596,7 +8527,6 @@ fout1:	EX DE,HL ;save buffer pointer
 	POP HL ;get the buffer pointer back
 	POP BC ;get the field length specifications back
 	OR H ;turn off the zero flag, this depends on the
-					; fact that fbuffr is never on page 0.
 fout2:	INC HL ;point to where the next character goes
 	LD (HL),'0' ;put a zero in the buffer in case the number
 					; is zero (in free format) or to reserve space
@@ -9707,7 +9637,6 @@ nolead:	XOR A ;make a zero
 finoho:	LD (DE),A ;store final zero
 	POP HL ;get pointer to fbuffr
 	RET ;all done.
-	page
 	subttl	exponentiation and the square root function
 					;all done
 
@@ -9797,7 +9726,6 @@ fpwr1:	POP HL ;get x back in fac
 					;if x was negative and y not an integer then
 	CALL fmult ; log will blow him out of the water
 ;	jmp	exp
-	page
 	subttl	exponential functon
 					;the function exp(x) calculates e^x where e=2.718282
 					;	the technique used is to employ a couple
@@ -9890,7 +9818,6 @@ expbcn:	db	7 ;degree + 1
 	db	201o
 					;end intfsw conditional
 
-	page
 	subttl	polynomial evaluator and the random number generator
 					;evaluate p(x^2)*x
 					;pointer to degree+1 is in (hl)
@@ -10074,7 +10001,6 @@ rndtb2:	db	150o
 	db	321o
 	db	165o
 	db	150o
-	page
 	subttl	sine, cosine and tangent functions
 					;cosine function
 					;idea:  use cos(x)=sin(x+pi/2)
@@ -10204,7 +10130,6 @@ tan:	CALL pushf ;save arg
 	CALL cos
 	JP fdivt
 
-	page
 	subttl	arctangent function
 					;idea: use identities to get arg between 0 and 1 and then use an
 					;approximation polynomial to compute arctan(x)
@@ -10269,7 +10194,6 @@ atncon:	db	11o ;degree
 ; Module: biptrg.mac
 ;======================================================================
 
-	page
 	title	biptrg	basic interpreter pointer get routines/whg/pga
 	subttl	dimension & variable searching - ptrget
 dimcon:	DEC HL ;see if comma ended this variable
@@ -10548,7 +10472,6 @@ pophr2:	POP HL ;get the text pointer
 	RET ;return from eval
 
 
-	page
 	subttl	multiple dimension code
 
 ;
@@ -10937,13 +10860,11 @@ ismat2:	POP BC ;restore saved registers
 	POP DE
 	RET
 
-	page
 
 ;======================================================================
 ; Module: biedit.mac
 ;======================================================================
 
-	page
 	title	biedit	basic interpreter edit routines/pga etc.
 	subttl	edit command
 ;
@@ -11278,7 +11199,6 @@ qed:	POP BC ;get rid of disped address
 ; Module: biprtu.mac
 ;======================================================================
 
-	page
 	title	biprtu	basic interpreter print using driver/whg
 	subttl	print using driver
 ;
@@ -11677,7 +11597,6 @@ plsprt:	PUSH AF ;save the current character
 ; Module: bio.mac
 ;======================================================================
 
-	page
 	title	bio basic interpreter i/o routines/whg/pga/mbm...
 	subttl	outdo, outcon - character output
 ; microsoft basic has a number of primitive i/o routines:
@@ -11840,7 +11759,6 @@ conout:	CALL 0 ;cpm (bios) entry point
 
 
 
-	page
 	subttl	inchr, tryin - character input routines
 inchr:
 	CALL ptrchk ;5.21: check if disk file input
@@ -11903,7 +11821,6 @@ inexit:
 
 					;for some reason sbc doent have cst
 					;terminates rshack
-	page
 	subttl	crdo	put out a carriage return and associated routines
 ; crdo returns with all registers except [a]
 ; preserved, [a]=0, zero cc set, carry reset.
@@ -12018,7 +11935,6 @@ outch1:
 ; Module: bimisc.mac
 ;======================================================================
 
-	page
 	title	bimisc	basic interpreter miscellaneous routines/whg/pga etc.
 
 ;
@@ -12114,7 +12030,6 @@ really:	PUSH DE ;save [d,e]
 	EX DE,HL ;back to [d,e]
 	POP DE ;restore [d,e]
 	RET ;done
-	page
 	subttl	nodsks, scratch (new), runc, clearc, stkini, qinlin
 ; the code below sets the file mode to 0 (closed) for all fcb'S
 nodsks:	LD A,(maxfil) ;get largest file #
@@ -12237,7 +12152,6 @@ stkerr:	LD SP,HL ;initialize stack
 gtmprt:	LD HL,(temp) ;get saved [h,l]
 	RET
 
-	page
 	subttl	dcompr, synchr - replacements for compar & synchk in rstles version
 dcompr:	LD A,H ;replacement for "COMPAR" rst
 	SUB D
@@ -12312,7 +12226,6 @@ diris:
 	LD HL,brktxt ;"BREAK"
 	JP NZ,errfin ;call strout and fall into ready
 	JP stprdy ;pop off line number & fall into ready
-	page
 	subttl	ctrlpt, ddt, cont, null, tron, troff
 ctropt:	LD A,conto ;print an ^o.
 ctrlpt:	PUSH AF ;save current char
@@ -12351,7 +12264,6 @@ ton:	db	76q ;"MVI A," non-zero quantity
 toff:	XOR A ;make [a]=0 for no trace
 	LD (trcflg),A ;update the trace flag
 	RET
-	page
 	subttl	swap, erase
 swap:	CALL ptrget ;[d,e]=pointer at value #1
 	PUSH DE ;save the pointer at value #1
@@ -12433,7 +12345,6 @@ casdon:
 popaht:	POP AF
 	POP HL ;get the text pointer
 	RET
-	page
 ;
 ;test for a letter / carry on=not a letter
 ;		     carry off=a letter
@@ -12526,7 +12437,6 @@ subde:	LD A,L
 	SBC D
 	LD D,A
 	RET
-	page
 	subttl	next code
 ;
 ; a "FOR" entry on the stack has the following format:
@@ -12678,14 +12588,12 @@ loopdn:	LD SP,HL ;eliminate the for entry
 					;blank variable name [d,e]=stk ptr
 					;and will never match any varptr
 					;use call to put dummy "NEWSTT" entry on
-	page
 					;end i8086 conditonal
 
 ;======================================================================
 ; Module: bistrs.mac
 ;======================================================================
 
-	page
 	title	bistrs	basic interpreter string  routines/whg/pga etc.
 ;
 ; the following routine compares two strings
@@ -12890,7 +12798,6 @@ strpr2:	DEC D ;decrement the length
 	CALL Z,crfin
 	INC BC ;point to the next character
 	JP strpr2 ;and print it...
-	page
 	subttl	string garbage collection - getspa, garbag
 ;
 ; getspa - get space for character string
@@ -13093,7 +13000,6 @@ grbpas:	POP DE ;pop off max pointer
 	DEC HL ;fix up fretop
 	JP fndvar ;and try to find high again
 
-	page
 	subttl	string concatenation
 ;
 ; the following routine concatenates two strings
@@ -13149,7 +13055,6 @@ movlp:	DEC L ;set cc'S
 	INC BC ;move pointers
 	INC DE
 	JP movlp ;keep doing it
-	page
 	subttl	free up string temporary - frestr, frefac, fretmp, fretms
 ;
 ; fretmp is passed a pointer to a string descriptor in [d,e]
@@ -13194,7 +13099,6 @@ fretms:	LD HL,(temppt) ;get temp pointer
 	LD (temppt),HL ;update the temp pointer since
 					;its been decremented by 4
 	RET
-	page
 	subttl	string functions - len, asc, chr$
 ;
 ; the function len($) returns the length of the
@@ -13276,7 +13180,6 @@ splp$:	LD (HL),A ;save char
 	DEC B
 	JP NZ,splp$ ;keep storing char
 	JP finbck ;put temp desc when done
-	page
 	subttl	string functions - left$, right$, mid$
 ;
 ; the following is the left$($,#) function.
@@ -13405,7 +13308,6 @@ pream2:	POP BC ;get return addr off stack
 	LD B,E ;save init length
 	RET
 
-	page
 	subttl	string functions - instr
 
 ; this is the instr fucntion. it takes one of two
@@ -13528,7 +13430,6 @@ ohwell:	POP BC
 	JP NZ,chk1 ;try searching some more
 	JP retzr1 ;end of string, return 0
 
-	page
 	subttl	string functions - left hand side mid$
 lhsmid:	CALL synchr
 	db	'(' ;must have ( 
@@ -13659,7 +13560,6 @@ clcdif:	EX DE,HL ;5.21: swap first
 ; Module: binlin.mac
 ;======================================================================
 
-	page
 	title	inlin basic interpreter input line routine/whg/pga/mbm, etc.
 	subttl	inlin - line input routine
 
@@ -13832,7 +13732,6 @@ eatnul:	CALL inchr ;eat next char
 	JP Z,inlinc ;eat it & get next char
 	JP inlnc1 ;use it
 					;must echo the char
-	page
 gfninl:
 	LD A,(tempa) ;do cr or not?
 	OR A ;test
@@ -13855,10 +13754,8 @@ scnsem:	PUSH AF ;save char
 ; Module: fiveo.mac
 ;======================================================================
 
-	page
 	title	fiveo 5.0 features -while/wend, call, chain, write /p. allen
 	.sall
-	page
 	subttl	while, wend
 ;
 ; this code handles the statements while/wend
@@ -13968,7 +13865,6 @@ fndwn3:	LD BC,0+$while
 
 weerr:	LD DE,0+errwe
 	JP error
-	page
 	subttl	call statement
 ; this is the call <simple var>[(<simple var>[,<simple var>]..)]
 ; stragegy:
@@ -14057,7 +13953,6 @@ callrt:	LD HL,(savstk) ;restore stack to former state
 	LD SP,HL
 	LD HL,(temp) ;get back text poiner
 	JP newstt ;get next statement
-	page
 	subttl	chain
 ; this is the code for the chain statement
 ; the syntax is:
@@ -14508,7 +14403,6 @@ mvbkvr:	CALL dcompr ;done?
 	LD L,C
 	JP newstt ;bye...
 common:	JP data
-	page
 	subttl	write
 write:
 	LD C,md.sqo ;setup output file
@@ -14590,7 +14484,6 @@ ntrndw:	POP HL ;restore [h,l]
 ; Module: dskcom.mac
 ;======================================================================
 
-	page
 	title	dskcom - - common routines for disk basics
 
 
@@ -14624,7 +14517,6 @@ filset:	LD D,B ;5.21: copy BC to DE first
 	EX DE,HL ;text pointer back into [h,l]
 	RET
 
-	page
 	subttl	filscn, filfrm, and filidx
 ;
 ; at this entry point [h,l] is assumed to be the text pointer and
@@ -14675,7 +14567,6 @@ ntfivd:
 	ADD HL,BC ;add start of file data block
 	EX DE,HL ;return in [d,e]
 	RET
-	page
 
 mki$:	LD A,2 ;value type for integer and number
 					;of characters result will need
@@ -14713,7 +14604,6 @@ cvd:	LD A,7 ;double precision value type -1
 					;and for identification
 	JP vmovfm ;move in the string data
 
-	page
 	subttl	setup to read a sequential item -- filind
 
 filind:
@@ -14724,7 +14614,6 @@ con1	set	0+(44*256)+32
 	JP NZ,inpdor ;if numeric, go read the file
 	LD E,D ;make both terminators comma
 	JP inpdor ;go read the file
-	page
 	subttl	line input & read code for item fetching from sequential input files
 
 dline:	CALL filinp ;get file number set up
@@ -14855,7 +14744,6 @@ strchr:	OR A ;trying to store null byte
 	POP BC ;get rid of superfluous stack entry
 	JP quit2b ;special quit
 
-	page
 prgfli:	LD D,md.sqi ;sequential input mode
 prgfl2:	XOR A ;internal file number is always zero
 	JP prgfil ;scan file name and disk nummer
@@ -14990,7 +14878,6 @@ maingo:	LD HL,(ptrfil) ;get file pointer
 	INC (HL) ;back up file by incrementing count
 	JP main
 
-	page
 	subttl	dispatch for direct statement
 ;
 ; make sure we'RE NOT READING A FILE IN
@@ -15006,7 +14893,6 @@ dirdo:
 	POP HL ;get back pointer at bufmin
 	JP gone ;execute direct statement
 
-	page
 	subttl	save command -- ascii or binary
 
 save:	LD D,md.sqo ;eliminate earlier version
@@ -15091,7 +14977,6 @@ clsall:	PUSH DE
 	XOR A ;return with [a]=0 and z on
 	RET
 
-	page
 	subttl	"FIELD" statement for setting up i/o strings
 field:	CALL filscn ;get data block pointer in [b,c]
 	JP Z,derbfn ;"BAD FILE NUMBER" if file not open
@@ -15161,7 +15046,6 @@ lopfld:	EX DE,HL ;save text pointer in [d,e]
 	RET NZ
 	endif ;just added up to 256, give syntax error if more
 	JP lopfld ;continue scanning "AS" clauses if more
-	page
 	subttl	random non-i/o -- lset/rset/field
 
 ;lset/rset stringvar = stringexp
@@ -15304,7 +15188,6 @@ makds1:	EX (SP),HL
 	PUSH BC
 	PUSH HL ;restore stack to previous state
 	JP madsc1 ;5.21: no push psw, skip pop psw
-	page
 	subttl	program i/o -- fixed length input
 
 ; format:
@@ -15371,7 +15254,6 @@ dskchr:	CALL indskc ;get char from file
 ; Module: dcpm.mac
 ;======================================================================
 
-	page
 	subttl	disk parameters and documentation
 	title	disk code for cpm/ontel/mostek/dmc/beehive: whg,pga,mbm
 
@@ -15693,7 +15575,6 @@ intret:	LD A,(HL)
 	DEC HL
 	LD L,(HL)
 	JP givint
-	page
 lof:	CALL filfrm ;convert argument and index
 	JP Z,derbfn ;"BAD FILE NUMBER" if not open
 
@@ -16113,7 +15994,6 @@ filsp2:	LD A,' ' ;space
 	JP NZ,filsp2 ;no, more spaces
 	JP gotnam ;yes, make sure name ok
 nmflcl:	JP dernmf ;5.21: local stub for error jumps
-	page
 name::
 	CALL namfil ;pick up the old name to use
 	PUSH HL ;save the text pointer
@@ -16519,7 +16399,6 @@ accfl2:	POP AF
 ; Module: fivdsk.mac
 ;======================================================================
 
-	page
 	title	fivdsk 5.0 features - variable length records, protected files /p. allen
 	.sall
 
@@ -16550,7 +16429,6 @@ accfl2:	POP AF
 ;8/6/179				make put, get increment loc correctly
 ;8/14/1979			puuut in basic cococompiler switch (main source)
 ;%
-	page
 	subttl	varecs - variable record scan for open
 
 ;	enter varecs with file mode in [a]
@@ -16583,7 +16461,6 @@ zofivb:	INC HL ;increment pointer
 	POP HL ;text pointer 
 	POP DE ;restore [d,e]
 	RET
-	page
 	subttl	put and get statements
 
 put:	db	366o ;"ORI"to set non-zero flag
@@ -16943,7 +16820,6 @@ cmpfps:	CALL getfps ;get present posit
 	CALL dcompr ;see if were at end
 	RET
 
-	page
 	subttl	protected files
 
 prosav:	CALL chrgtr ;get char after "S"
@@ -17056,11 +16932,9 @@ pgtflg:	ds	1 ;put/get flag (non zero=put)
 ; Module: init.mac
 ;======================================================================
 
-	page
 	title	init initailization for basic 8080/z80 gates/allen/davidoff
 swtchr	set	57o ;default switch character is slash
 
-	page
 	subttl	system initialization code
 ;this is the system initialization code
 ;it should be loaded at the end of the basic
