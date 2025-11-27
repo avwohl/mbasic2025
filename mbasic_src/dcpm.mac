@@ -69,7 +69,7 @@ trurom	set	0
 
 	extrn	dcompr,getypr,synchr
 
-	extrn	filnam
+	extrn	filnam,filnm1,filnm9,filnm12
 	extrn	filna2
 	extrn	dirtmp
 ;internal symbols
@@ -167,7 +167,7 @@ q	set	dblksz
 ;sym=q
 ;q=q+siz>
 
-	public	fd.siz,fd.phy,fd.log,fd.chg,fd.ops,fd.dat
+	public	fd.siz,fd.phy,fd.log,fd.chg,fd.ops,fd.dm1,fd.dat
 fd.max	set	0			;size of field buffer
 
 ;ent	fd.siz,2		;variable length record size default 128
@@ -185,6 +185,8 @@ q	set	q+1
 ;ent	fd.ops,2		;output print position for print, input, write
 fd.ops	set	q
 q	set	q+2
+;5.21: fd.dm1 is fd.dat-1 for linker workaround
+fd.dm1	set	q-1
 ;ent	fd.dat,fd.max		;actual field data buffer
 fd.dat	set	q
 q	set	q+fd.max
@@ -790,7 +792,7 @@ fillo1:
 	jnz	fillop
 gotnam:
 	xra	a			;clear extent field
-	sta	filnam+12
+	sta	filnm12			;5.21: filnam+12
 	pop	psw			;restore condition codes
 	pop	h			;get back text pointer
 	ret	
@@ -926,7 +928,7 @@ prgfil:	mov	e,a			;save file number in [e]
 	mov	a,e			;get file number
 	ora	a			;set condition codes
 	jnz	prgdot			;not file 0, dont default file name
-	lxi	h,filnam+9-0-0-2*0	;point to first char of extension
+	lxi	h,filnm9		;5.21: point to first char of extension (filnam+9)
 	mov	a,m			;get it
 	cpi	' '			;blank extension
 	jnz	prgdot			;non-blank extension, dont use default
@@ -1108,12 +1110,12 @@ files:
 	pop	h			;restore text pointer
 filnb:	cnz	namfil			;scan file name
 	xra	a			;make sure extent is zero
-	sta	filnam+12
+	sta	filnm12			;5.21: filnam+12
 	push	h			;save text pointer
-	lxi	h,filnam+1		;get first char of file name
+	lxi	h,filnm1		;5.21: get first char of file name (filnam+1)
 	mvi	c,8			;fill name with question marks
 	call	filqs
-	lxi	h,filnam+9		;point to extension
+	lxi	h,filnm9		;5.21: point to extension (filnam+9)
 	mvi	c,3			;3 chars in extension
 	call	filqs			;fill it with qmarks
 	lxi	d,dirtmp		;set buffer to 80 hex

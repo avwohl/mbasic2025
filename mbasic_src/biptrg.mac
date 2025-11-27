@@ -53,12 +53,12 @@ trurom	set	0
 	subttl	dimension & variable searching - ptrget
 	extrn	aryta2,arytab,bltu,dimflg,errbs,error,fac,fcerr
 	extrn	faclo,getstk,intidx,islet,islet2,omerr,reason,snerr,strend
-	extrn	subflg,temp2,temp3,umult,valtyp,vartab,reddy,pophrt,errdd,retvar
+	extrn	subflg,temp2,temp3,umult,valtyp,vartab,reddym,reddy,pophrt,errdd,retvar
 	extrn	chrgtr,dcompr,synchr
 	extrn	getypr
-	extrn	nambuf,namcnt,namtmp
+	extrn	namcnt,nambuf,namtmp
 	extrn	optval
-	extrn	parm1,prmflg,prmlen,deftbl,nofuns
+	extrn	parm1,prmflg,prmlen,deftbl,defta,nofuns
 	public	ptrget,bserr,ptrgt2,dim,noarys
 dimcon:	dcx	h			;see if comma ended this variable
 	call	chrgtr
@@ -114,7 +114,7 @@ ptrgt3:	call	islet2			;set carry if not alphabetic
 issec:	mov	b,a			;it is a number--save in b
 	push	b			;save [b,c]
 	mvi	b,255			;[b] counts the characters past #2
-	lxi	d,nambuf-1		;the place to put the characters
+	lxi	d,namcnt		;5.21: the place to put the characters (nambuf-1)
 vmorch:	ori	128			;extra characters must have the high bit on
 					;so erase can scan backwards over them
 	inr	b			;increase the chacracter count
@@ -160,7 +160,7 @@ tabtyp:	mov	a,c			;get the starting character
 	mov	e,a			;build a two byte offset
 	mvi	d,0
 	push	h			;save the text pointer
-	lxi	h,deftbl-'A'		;see what the default is
+	lxi	h,defta			;5.21: see what the default is
 	dad	d
 	mov	d,m			;get the type out of the table
 	pop	h			;get back the text pointer
@@ -331,7 +331,7 @@ finzer:
 	shld	faclo
 	call	getypr			;see if its a string
 	jnz	pophr2			;if not, done
-	lxi	h,reddy-1		;make it a null string by
+	lxi	h,reddym		;5.21: make it a null string by
 	shld	faclo			;pointing at a zero
 pophr2:	pop	h			;get the text pointer
 	ret				;return from eval

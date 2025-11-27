@@ -82,7 +82,7 @@ trurom	set	0
 ;8/14/1979			puuut in basic cococompiler switch (main source)
 ;%
 	extrn	datofs,derbfm,derbrn,fcerr,maxtrk,fivdpt,locofs
-	extrn	fd.siz,fd.phy,fd.log,fd.chg,fd.ops,fd.dat
+	extrn	fd.siz,fd.phy,fd.log,fd.chg,fd.ops,fd.dm1,fd.dat
 	extrn	derfov,nmlofs
 	extrn	filscn,proflg,curlin,sincon,atncon,gtmprt
 	extrn	temp,txttab,vartab,snerr,maxrec
@@ -418,9 +418,9 @@ filofv:	pop	psw			;get character off stack
 	mov	b,h			;[b,c]=file data block
 	mov	c,l
 	call	cmpfps			;any room in buffer
-	jz	derfov			;no
+	jz	iflcl			;5.21: no (via local stub)
 	call	setfpi			;save new position
-	lxi	h,0+fd.dat-1		;index into data buffer
+	lxi	h,0+fd.dm1		;5.21:index into data buffer
 	dad	b			;add start of file control block
 	dad	d			;add offset into buffer
 	pop	psw			;get back char
@@ -446,7 +446,7 @@ filifv:	push	d			;save [d,e]
 	call	cmpfbc			;compare to present posit
 	jz	iflcl			;return with null 
 	call	setfpi			;set new position
-	lxi	h,0+fd.dat-1		;point to data
+	lxi	h,0+fd.dm1		;5.21:point to data
 	dad	b
 	dad	d
 	mov	a,m			;get the byte

@@ -383,7 +383,7 @@ cntccn:
 	extrn	stop
 	jmp	stop
 	public	inkey,charcg
-	extrn	dscptr,putnew,reddy,faclo,valtyp,strin1,charc,setstr
+	extrn	dscptr,putnew,reddym,reddy,faclo,valtyp,strin1,charc,setstr
 	extrn	chrgtr
 inkey:
 	call	chrgtr
@@ -404,7 +404,7 @@ bufcin:	push	psw
 	mov	e,a			;char to [d]
 	call	setstr			;stuff in descriptor and goto putnew
 
-nulrt:	lxi	h,reddy-1
+nulrt:	lxi	h,reddym		;5.21: reddy-1
 	shld	faclo
 	mvi	a,3
 	sta	valtyp

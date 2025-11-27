@@ -53,7 +53,7 @@ trurom	set	0
 	.sall	
 	extrn	chrgtr,synchr,dcompr
 	extrn	getypr
-	extrn	snerr,getstk,ptrget,subflg,temp,crdo
+	extrn	snerr,getstk,ptrget,ptrglb,subflg,temp,crdo
 	extrn	vmovfm,frcint
 	page
 	subttl	while, wend
@@ -194,7 +194,7 @@ calls:
 	xchg				;var pointer to [h,l]
 	call	getypr			;get type of var
 	call	vmovfm			;store value in fac
-	call	frcint			;evaluate var
+	call	frqint			;5.21: changed from frcint to frqint
 	shld	tempa			;save it
 	mvi	c,maxprm		;check to see if we have space for max parm block
 	call	getstk
@@ -399,7 +399,7 @@ docomm:	call	chrgtr			;get thing after common
 nxtcom:	push	h			;save text pointer
 	mvi	a,1			;call ptrget to search for array
 	sta	subflg
-	call	ptrget			;this subroutine in f3 scans variables
+	call	ptrglb			;5.21: changed from ptrget to ptrglb
 	jz	fndaay			;found array
 	mov	a,b			;try finding array with common bit set
 	ori	128
@@ -418,7 +418,7 @@ ntfn2t:	mov	a,m			;get terminator
 	cpi	'('			;array specifier?
 	jz	fcerr			;no such animal, give "Function call" error
 scnsmp:	pop	h			;rescan variable name for start
-	call	ptrget			;evaluate as simple
+	call	ptrglb			;5.21: evaluate as simple (via stub)
 comptr:	mov	a,d			;if var not found, [d,e]=0
 	ora	e
 	jnz	comfns			;found it
