@@ -1,0 +1,255 @@
+#!/bin/bash
+# Disassemble mbasic.com with accumulated knowledge from source analysis
+# Run from mbasic2025 directory
+
+cd "$(dirname "$0")/.."
+export PYTHONPATH=/home/wohl/um80_and_friends
+
+python3 -m um80.ud80 com/mbasic.com \
+    -o disasm/mbasic.mac \
+    \
+    -l 0100,start \
+    \
+    -t 0103-01CD \
+    \
+    -e 297A,ends \
+    -e 29DC,for \
+    -e 4406,next \
+    -e 11BF,datas \
+    -e 459E,input \
+    -e 14EC,dim \
+    -e 1863,read \
+    -e 3986,let \
+    -e 1940,goto \
+    -e 1518,run \
+    -e 1495,ifs \
+    -e 1467,restor \
+    -e 1651,gosub \
+    -e 43E6,return \
+    -e 147D,rem \
+    -e 14D1,stop \
+    -e 14EE,print \
+    -e 4401,clear \
+    -e 169C,list \
+    -e 450E,scrath \
+    -e 2089,ongoto \
+    -e 4320,null \
+    -e 1585,fnwait \
+    -e 4473,def \
+    -e 2003,poke \
+    -e 1E2B,cont \
+    -e 22C0,csave \
+    -e 445D,out \
+    -l 0CC9,snerr \
+    -l 0CE3,error \
+    -e 1FFD,lprint \
+    -e 1694,llist \
+    \
+    -l 1305,chrgtr \
+    -l 1306,chrgt2 \
+    -l 4137,conout \
+    -l 414D,crdo \
+    -l 2483,outdo \
+    -l 1A02,frmevl \
+    -l 1A03,frmchk \
+    -l 1A05,lpoper \
+    -l 43D3,synchr \
+    -l 4397,stkini \
+    -l 43CD,dcompr \
+    -l 1D64,getypr \
+    -l 2899,pushf \
+    -l 2075,getbyt \
+    -l 0EF8,fndlin \
+    -l 0EFB,fndlp \
+    -l 4504,islet2 \
+    -l 28B4,movfr \
+    -l 1C5A,makupl \
+    -l 41F5,conin \
+    -l 4221,crlfot \
+    -l 1418,fcerr \
+    -l 14CC,userr \
+    -l 398B,ptrget \
+    -l 4503,islet \
+    -l 1428,linget \
+    \
+    -l 5D8C,init \
+    \
+    -l 017F,fundsp \
+    -e 3879,string$ \
+    -e 391C,right$ \
+    -e 3931,cint \
+    -e 4AF6,cvi \
+    -e 1FF2,inp \
+    -e 1DD1 \
+    -e 48D6,loc \
+    -e 4696,lof \
+    -e 49A4 \
+    -e 48E2 \
+    -e 48F2,fix \
+    -e 22B6,cload \
+    -e 59B7,left$ \
+    -e 58BA,mid$ \
+    -e 5417,sgn \
+    -e 5AFE,vint \
+    -e 5AFD,abs \
+    -e 53D9,sqr \
+    -e 529B,rnd \
+    -e 535C,sin \
+    -e 5A04,log \
+    -e 5865,exp \
+    -e 59D7,cos \
+    -e 547B,tan \
+    -e 547A,atn \
+    -e 539A,fre \
+    -e 59BE,fninp \
+    -e 4948,pos \
+    -e 4979,len \
+    -e 4983,str$ \
+    -e 287C,val \
+    -e 2A80,asc \
+    -e 2867,chr$ \
+    -e 36C0,peek \
+    -e 37DD,space$ \
+    -e 387F,oct$ \
+    -e 26BD,hex$ \
+    -e 372B,lpos \
+    \
+    -l 023B,atab \
+    -dc 023B-024A \
+    -l 024C,btab \
+    -l 024D,ctab \
+    -dc 024D-0285 \
+    -l 0287,dtab \
+    -dc 0287-02AE \
+    -l 02B0,etab \
+    -dc 02B0-02D3 \
+    -l 02D5,ftab \
+    -dc 02D5-02E9 \
+    -l 02EB,gtab \
+    -dc 02EB-02FB \
+    -l 02FD,htab \
+    -dc 02FD-0300 \
+    -l 0302,itab \
+    -dc 0302-031C \
+    -l 031E,jtab \
+    -l 031F,ktab \
+    -dc 031F-0322 \
+    -l 0324,ltab \
+    -dc 0324-0356 \
+    -l 0358,mtab \
+    -dc 0358-036F \
+    -l 0371,ntab \
+    -dc 0371-0382 \
+    -l 0384,otab \
+    -dc 0384-0398 \
+    -l 039A,ptab \
+    -dc 039A-03AC \
+    -l 03AE,qtab \
+    -l 03AF,rtab \
+    -dc 03AF-03EB \
+    -l 03ED,stab \
+    -dc 03ED-0420 \
+    -l 0422,ttab \
+    -dc 0422-0437 \
+    -l 0439,utab \
+    -dc 0439-0440 \
+    -l 0442,vtab \
+    -dc 0442-044A \
+    -l 044C,wtab \
+    -dc 044C-0462 \
+    -l 0464,xtab \
+    -dc 0464-0466 \
+    -l 0468,ytab \
+    -l 0469,ztab \
+    \
+    -l 04B4,nferms \
+    -da 04B4-04C3 \
+    -l 04C5,snerms \
+    -da 04C5-04D0 \
+    -l 04D2,rgerms \
+    -da 04D2-04E5 \
+    -l 04E7,oderms \
+    -da 04E7-04F1 \
+    -l 04F3,fcerms \
+    -da 04F3-0507 \
+    -l 0509,ovrmsg \
+    -da 0509-0510 \
+    -l 0512,omerms \
+    -da 0512-051E \
+    -l 0520,userms \
+    -da 0520-0534 \
+    -l 0536,bserms \
+    -da 0536-054B \
+    -l 0562,divmsg \
+    -da 0562-0571 \
+    -l 0582,tmerms \
+    -da 0582-058E \
+    \
+    -l 0C45,reddy \
+    -da 0C45-0C4C \
+    -l 0C4D,brktxt \
+    -da 0C4D-0C52 \
+    \
+    -l 0796,topmem \
+    -l 0798,curlin \
+    -l 079A,txttab \
+    -l 0AB1,savstk \
+    -l 0AB3,errlin \
+    -l 0BED,mrgflg \
+    -l 0BF3,chnflg \
+    -l 0A67,valtyp \
+    -l 0C04,faclo \
+    -l 0C0D,arglo \
+    -l 078C,ttypos \
+    -l 0793,prtflg \
+    -l 0794,memsiz \
+    \
+    -l 46C7,strlit \
+    -l 46C8,strlti \
+    -l 46CB,strlt2 \
+    -l 48A8,frefac \
+    -l 48AB,fretm2 \
+    -l 48AC,fretmp \
+    -l 48C6,fretms \
+    -l 0A78,temppt \
+    \
+    -l 2845,sign \
+    -l 284F,icomps \
+    -l 2850,signs \
+    -l 28C3,move \
+    -l 28C9,vmove \
+    -l 28CD,move1 \
+    -l 0C07,fac \
+    -l 0C06,facs \
+    -l 2A3B,chkstr \
+    -l 0CE1,tmerr \
+    -l 12A0,newstt \
+    -l 425C,cntccn \
+    -l 0AAF,savtxt \
+    -l 0A9B,fretop \
+    -l 0AC2,vartab \
+    -l 0AC4,arytab \
+    -l 0AC6,strend \
+    -l 2874,neg \
+    -l 2585,fsub \
+    -l 2588,fadd \
+    -l 2703,fmult \
+    -l 2769,fdiv \
+    -l 2803,muldiv \
+    -l 2906,fcomp \
+    -l 284E,fcomps \
+    -l 42DD,omerr \
+    -l 42EB,reason \
+    -l 42FF,really \
+    -l 4767,garba2 \
+    -l 42B6,bltu \
+    -l 42B9,bltuc \
+    -l 42BC,bltlop \
+    -l 4723,strout \
+    -l 4726,strprt \
+    -l 28B9,getbcd \
+    \
+    2>&1
+
+echo "Output: disasm/mbasic.mac"
+wc -l disasm/mbasic.mac
