@@ -515,6 +515,7 @@ binsav:
 	call	prochk			;dont allow binary saves of protected programs
 	mvi	a,255			;always start with 255
 binpsv:	call	filou3			;send to file
+	xchg				;5.21: redundant xchg
 	lhld	vartab			;get stop point
 	xchg				;save in [d,e]
 	lhld	txttab			;get start point
@@ -719,10 +720,10 @@ madesc:	pop	psw
 	push	b			;restore stack to previous state
 	push	h
 	inx	h
+	push	psw			;5.21: push after first inx h
 	mov	m,e
 	inx	h
 	mov	m,d			;set pointer to stringvar copy
-	push	psw
 oldstr:	pop	psw
 	pop	h			;get stringvar descr.
 	inx	h
@@ -731,13 +732,11 @@ oldstr:	pop	psw
 	mov	d,m			;get pointer to text area
 	pop	b			;get lengths off stack
 	pop	h			;get pointer to stringexp descr.
-	push	d
+	inx	h			;5.21: load HL via A register
+	mov	a,m			;get low byte
 	inx	h
-	mov	e,m
-	inx	h
-	mov	d,m			;get ptr to stringexp text
-	xchg				;put pointer in [h,l]
-	pop	d
+	mov	h,m			;get high byte into H
+	mov	l,a			;put low byte into L
 	mov	a,c			;get length of field(stringvar)
 	cmp	b
 	jnc	fildok			;jump if field large enough for result
@@ -788,11 +787,10 @@ makdsc:	pop	psw			;get temp flag
 	call	strini			;make a temp point to stringexp
 	call	putnew			;get a temp to point to it
 	pop	b
-makds1:	xthl	
+makds1:	xthl
 	push	b
 	push	h			;restore stack to previous state
-	push	psw
-	jmp	madesc
+	jmp	madesc			;5.21: no push psw
 	page
 	subttl	program i/o -- fixed length input
 

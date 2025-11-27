@@ -6,6 +6,12 @@
 - When displaying binary data, always use hex encoding (e.g., `.hex()` in Python)
 - Use `xxd` or similar tools that produce safe ASCII output
 
+## Disassembly Reference
+
+- Pre-generated disassemblies are in the `disasm/` directory
+- Use `disasm/mbasic.mac` to look up reference code at specific addresses
+- This is faster and more accurate than using xxd for understanding code structure
+
 ## Binary Comparison Procedure
 
 When comparing reference mbasic.com to our build:

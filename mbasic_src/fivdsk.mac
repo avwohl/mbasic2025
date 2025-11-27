@@ -147,8 +147,8 @@ get:	xra	a			;set zero
 	call	chrgtr
 	jnz	snerr
 	xthl				;save text pointer, get data block pointer
-	mov	a,e			;get record #
-	ora	d			;make sure its not zero
+	mov	a,d			;5.21: test high byte first
+	ora	e			;make sure its not zero
 	jz	derbrn			;if so, "Bad record number"
 	dcx	h
 	mov	m,e
@@ -310,6 +310,7 @@ datmof:	lda	pgtflg			;put or get
 nofvrd:	push	b
 	mov	b,h
 	mov	c,l
+	xchg				;5.21: redundant xchg
 	lhld	pbuff
 	xchg	
 	lhld	lbuff			;get ready to move bytes between buffers
@@ -319,19 +320,20 @@ nofvrd:	push	b
 	mov	e,c
 	pop	b			;restore fdb pointer
 	call	putsub			;do write
-nxfvbf:	pop	h			;count
+nxfvbf:	lhld	record			;5.21: increment record first
+	inx	h
+	shld	record
+	pop	h			;count
 	mov	a,l			;make count correct
 	sub	e
 	mov	l,a
 	mov	a,h
 	sbb	d
 	mov	h,a
+	mov	a,h			;5.21: explicit test
 	ora	l			;is count zero?
 	lxi	d,0			;set offset=0
 	push	h			;save count
-	lhld	record
-	inx	h			;increment it
-	shld	record			;save back
 	jnz	nxtopd			;keep working on it
 	pop	h			;get rid of count
 	pop	h			;restore text pointer
@@ -346,6 +348,7 @@ fivdrd:	push	h			;save bytes
 	push	b
 	mov	b,h
 	mov	c,l
+	xchg				;5.21: redundant xchg
 	lhld	lbuff			;point to logical buffer
 	xchg	
 	lhld	pbuff
@@ -362,6 +365,7 @@ getsub:	xra	a
 	push	b
 	push	d
 	push	h
+	xchg				;5.21: redundant xchg
 	lhld	record
 	xchg	
 	lxi	h,0+fd.phy		;point to physical record #
@@ -436,11 +440,11 @@ fiscr:	pop	psw			;restore all regs
 	pop	b
 	pop	d
 	pop	h
-	ret	
-
+	ret
+iflcl:	jmp	derfov			;5.21: local stub for error
 filifv:	push	d			;save [d,e]
 	call	cmpfbc			;compare to present posit
-	jz	derfov			;return with null 
+	jz	iflcl			;return with null 
 	call	setfpi			;set new position
 	lxi	h,0+fd.dat-1		;point to data
 	dad	b
