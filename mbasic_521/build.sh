@@ -1,8 +1,6 @@
 #!/bin/bash
 # Build mbasic from sources
 
-export PYTHONPATH=/home/wohl/um80_and_friends
-
 mkdir -p out
 
 # Assemble all modules
