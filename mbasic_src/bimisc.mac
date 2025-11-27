@@ -231,11 +231,11 @@ lopdft:	mvi	m,4			;loop 26 times storing a default valtyp
 	jnz	lopdft			;loop back, and setup the rest of the table
 levdtb:
 	extrn	rndcop,rndx,move
-	extrn	rndcnt
+	extrn	rndcm,rndcnt
 	lxi	d,rndcop		;reset the random number generator
 	lxi	h,rndx			;seed in rndx
 	call	move
-	lxi	h,rndcnt-1		;and zero count registers
+	lxi	h,rndcm			;5.21: and zero count registers (rndcnt-1)
 	xra	a
 	mov	m,a
 	inx	h
@@ -450,7 +450,7 @@ swap:	call	ptrget			;[d,e]=pointer at value #1
 	push	h			;save the pointer at value #2
 	lhld	arytab			;get new [arytab]
 	call	dcompr
-	jnz	fcerr			;if its changed, error
+	jnz	fcerj			;5.21: if its changed, error (via stub)
 	pop	d			;[d,e]=pointer at value #2
 	pop	h			;[h,l]=text pointer
 	xthl				;save the text pointer on the stack
@@ -464,13 +464,13 @@ swap:	call	ptrget			;[d,e]=pointer at value #1
 					;old position
 	pop	h			;get the text pointer back
 	ret
-	jmp	fcerr			;5.21: unreachable code in original
+fcerj:	jmp	fcerr			;5.21: stub for indirect jump
 	public	erase
 erase:
 	mvi	a,1
 	sta	subflg			;that this is "ERASE" calling ptrget
 	call	ptrget			;go find out where to erase
-	jnz	fcerr			;ptrget did not find variable!
+	jnz	fcerj			;5.21: ptrget did not find variable! (via stub)
 	push	h			;save the text pointer
 	sta	subflg			;zero out subflg to reset "ERASE" flag
 	mov	h,b			;[b,c]=start of array to erase
@@ -519,7 +519,7 @@ islet2:	cpi	'A'
 	cpi	91			;91="Z"+1
 	cmc
 	ret
-	jmp	clearc			;5.21: unreachable code in original
+cleaj:	jmp	clearc			;5.21: stub for indirect jump
 	subttl	clear
 ;
 ; this code is for the "CLEAR" command with an argument
@@ -528,19 +528,19 @@ islet2:	cpi	'A'
 ; remains unchanged.
 ;
 	public	clear
-clear:	jz	clearc			;if no formula just clear
+clear:	jz	cleaj			;5.21: if no formula just clear (via stub)
 	cpi	54o			;allow no string space
 	jz	cskpcm
 	call	intid2			;get an integer into [d,e]
 	dcx	h
 	call	chrgtr			;see if its the end
-	jz	clearc
+	jz	cleaj			;5.21: via stub
 cskpcm:	call	synchr
 	db	54o
-	jz	clearc
-	xchg	
+	jz	cleaj			;5.21: via stub
+	xchg
 	lhld	topmem			;get highest address
-	xchg	
+	xchg
 	cpi	54o
 	jz	clears			;should finish there
 	call	clrhlp			;5.21: call helper subroutine
@@ -551,7 +551,7 @@ clears:	dcx	h			;back up
 	call	synchr
 	db	54o
 	jz	cdfstk
-	call	intid2
+	call	clrhlp			;5.21: changed from intid2 to clrhlp
 	dcx	h
 	call	chrgtr
 	jnz	snerr
@@ -559,29 +559,29 @@ cleart:	xthl				;save text pointer
 	push	h			;save candidate for topmem
 	lxi	h,0+(2*numlev)+20	;check stack size is reasonable
 	call	dcompr
-	jnc	omerr
+	jnc	omerj			;5.21: via stub
 	pop	h
 	call	subde			;subtract [h,l]-[d,e] into [d,e]
-	jc	omerr			;wanted more than total!
+	jc	omerj			;5.21: wanted more than total! (via stub)
 	push	h			;save memsiz
 	lhld	vartab			;top location in use
 	lxi	b,0+20			;leave breathing room
 	dad	b
 	call	dcompr			;room?
-	jnc	omerr			;no, don'T EVEN CLEAR
+	jnc	omerj			;5.21: no, don't even clear (via stub)
 	xchg				;new stack location [h,l]
 	shld	memsiz			;set up new stack location
 	pop	h			;get back memsiz
 	shld	topmem			;set it up, must be ok
 	pop	h			;regain the text pointer
-	jmp	clearc			;go clear
+	jmp	cleaj			;5.21: go clear (via stub)
 ;5.21: helper subroutine for CLEAR formula evaluation
 clrhlp:	call	frmhqi			;call helper at 22D1
 	mov	a,d
 	ora	e
 	jz	fcerr			;error if zero
 	ret
-	jmp	omerr			;5.21: unreachable code
+omerj:	jmp	omerr			;5.21: stub for indirect jump
 cdfstk:	push	h			;save text pointer
 	lhld	topmem			;figure out current stack size so
 	xchg				;it is saved

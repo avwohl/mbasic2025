@@ -108,7 +108,7 @@ kbflen	set	buflen+(buflen/4)	;make krunch buffer somewhat
 	extrn	ends,next,restor,scrath,cont,fre
 	extrn	movfr,movrf,movrm,inprt,linprt,fdivt
 	extrn	movfm,movmf,floatr,fadds
-	public	fac,faclo,overr,newstt,retvar,oldlin,frmchk,brktxt,chrcon
+	public	fac,faclo,facs,overr,newstt,retvar,oldlin,frmchk,brktxt,chrcon
 	public	fndlin,arytab,fini
 	extrn	inrart,neg,float
 	extrn	stroui,bserr
@@ -128,7 +128,8 @@ kbflen	set	buflen+(buflen/4)	;make krunch buffer somewhat
 	public	errlin,onelin,oneflg,trcflg,buflin,lisprt
 	extrn	strng$,space$,ton,toff
 	extrn	signs
-	public	fbuffr,minutk,plustk,linget,intxt,reddy
+	public	fbuffr,fbufp1,fbufp27,fbufp33,fbufp34,fmltt1,fmltt2
+	public	minutk,plustk,linget,intxt,reddym,reddy
 	extrn	ttychr
 	public	txttab
 	extrn	init
@@ -147,7 +148,7 @@ kbflen	set	buflen+(buflen/4)	;make krunch buffer somewhat
 	extrn	idiv,imod
 	extrn	vmove,valint,valsng,frcstr,chkstr,makint
 	public	prmlen,prmln2,prmflg,nofuns,parm1,temp9
-	public	dfaclo,arg,arglo,temp2,temp3,deftbl,funact
+	public	dfaclo,dfacx,arg,arglo,arglox,args,temp2,temp3,deftbl,defta,funact
 	extrn	move1
 	public	strprn
 	public	caltty
@@ -1520,7 +1521,7 @@ errflg:	db	0			;used to save the error number so edit can be
 	public	lptlst
 lptlst:	db	0			;last line printer operation. zero means linefeed
 					;non-zero means print command (okia only)
-lptpos:	db	1			;position of lpt print head
+lptpos:	db	0			;position of lpt print head
 prtflg:	db	0			;whether output goes to lpt
 	public	nlppos,lptsiz
 lncmps	set	(((lptlen/clmwid)-1)*clmwid);last comma field posit
@@ -1543,8 +1544,9 @@ cntofl:	db	0			;supress output flag
 ptrfil:	dw	0			;pointer to data block of current file
 					;used by disk and ncr cassette code
 
+	extrn	stka3			;5.21: tstack+163 alias
 topmem:
-	dw	tstack+100		;top location to use for the stack
+	dw	stka3			;top location to use for the stack
 					;initially set up by init
 					;according to memory size
 					;to allow for 50 bytes of string space.
@@ -1553,7 +1555,8 @@ topmem:
 curlin:	dw	0+65534			;current line #
 					;set to 65534 in pure version during init execution
 					;set to 65535 when direct statements execute
-txttab:	dw	tstack+1		;pointer to beginning of text
+	extrn	stk40			;5.21: tstack+64 alias
+txttab:	dw	stk40			;pointer to beginning of text
 					;doesn'T CHANGE AFTER BEING
 					;setup by init.
 	public	overri
@@ -1577,10 +1580,13 @@ maxfil:	ds	1			;highest file number allowed
 namcnt:	ds	1			;the number of character beyond #2 in a var name
 nambuf:	ds	namlen-2		;storage for chars beyond #2. used in ptrget
 namtmp:	ds	2			;temp storage during name save at indlop
-	public	dirtmp,filna2,filnam
+	public	dirtmp,filna2,filnam,filnm1,filnm9,filnm12
 dirtmp	set	cpmwrm+128		;use cpm default buffer in low memory
 filna2:	ds	16			;used by name code
-filnam:	ds	33			;because cpm must have buffer for directory reads
+filnam:	ds	1			;5.21: split for filnam+N workaround
+filnm1:	ds	8			;5.21: filnam+1
+filnm9:	ds	3			;5.21: filnam+9
+filnm12: ds	21			;5.21: filnam+12
 
 ;	cp/m 1.4 and 2.x support
 
@@ -1722,6 +1728,7 @@ datptr:	ds	2			;pointer to data. initialized to point
 					;by "RESTORE" which is called by clearc
 					;updated by execution of a "READ"
 deftbl:	ds	26			;this gives the default valtyp for each
+defta	equ	deftbl-'A'		;5.21: base for type table lookup
 					;letter of the alphabet
 					;it is set up by "CLEAR" and changed by
 					;"DEFSTR" "DEFINT" "DEFSNG" "DEFDBL" and used
@@ -1736,7 +1743,7 @@ prmstk:	dw	0			;previous definition block on stack
 prmlen:	ds	2			;the number of bytes in the active table
 parm1:	ds	prmsiz			;the active parameter definition table
 	public	prmprv,prmstk		;allow init to initialize this constant
-prmprv:	dw	prmstk			;the pointer at the previous parameter
+prmprv:	ds	2			;the pointer at the previous parameter
 					;block (for garbage collection)
 prmln2:	ds	2			;size of parameter block being built
 parm2:	ds	prmsiz			;place to keep parameters being made
@@ -1783,10 +1790,10 @@ trcflg:	ds	1			;zero means no trace in progress
 ; this is the ram termporary area for the math package routines
 ;
 ;the floating accumulator
-	ds	1			;[temporary least significant byte]
+dfacx:	ds	1			;5.21: extra byte before dfaclo (dfaclo-1)
 dfaclo:	ds	4			;[four lowest orders for double precision]
 faclo:	ds	2
-	ds	1
+facs:	ds	1			;5.21: sign byte of fac (fac-1)
 					;[middle order of mantissa]
 					;[high order of mantissa]
 fac:	ds	2			;[exponent]
@@ -1797,24 +1804,26 @@ flgovc:	ds	1			;overflow print flag,=0,1 print
 					;further =1 change to 2
 ovcstr:	ds	1			;place to store overflow flag after fin
 fansii:	ds	1			;flag to force fixed output (see ansi)
-	ds	1			;[temporary least significant byte]
-arglo:	ds	7			;[location of second argument for double
+arglox:	ds	1			;5.21: extra byte before arglo (arglo-1)
+arglo:	ds	6			;[location of second argument for double
+args:	ds	1			;5.21: sign byte of arg (arg-1)
 arg:	ds	1			; precision]
 					;for intel formats must have space for
 					;11 bits of exponent
-fbuffr:	ds	13			;buffer for fout
-
-	ds	43-13			;the last 3 locations are temp for rom fmult
-	public	fmltt1,fmltt2
-fmltt1	set	fbuffr+40
-fmltt2	set	fbuffr+41
+fbuffr:	ds	1			;buffer for fout
+fbufp1:	ds	26			;5.21: fbuffr+1
+fbufp27: ds	6			;5.21: fbuffr+27
+fbufp33: ds	1			;5.21: fbuffr+33
+fbufp34: ds	6			;5.21: fbuffr+34
+fmltt1:	ds	1			;5.21: fbuffr+40
+fmltt2:	ds	2			;5.21: fbuffr+41 (plus padding to 43)
 	page
 	subttl	text constants for print out
 ;
 ; needed for messages in all versions
 ;
 intxt:	dc	' in '
-	db	0
+reddym:	db	0			;5.21: reddy-1 (null terminator)
 reddy:
 	dc	'Ok'
 	db	13
@@ -2435,8 +2444,8 @@ kcont:	cpi	'?'			;a qmark?
 	lxi	d,ubstr			;"UB"
 	call	gostrcm
 	jnz	notgos			;neither TO nor UB
-	mvi	a,$gosub
-gputrs:	pop	b			;discard saved text ptr
+gputrs:	mvi	a,$gosub
+	pop	b			;discard saved text ptr
 	jmp	notfn2			;store the token
 ;
 ; string compare subroutine for GO parsing
@@ -2566,7 +2575,7 @@ notrs6:	sta	donum			;save in flag
 	pop	psw			;get back token
 	cpi	$while			;5.21: check for WHILE token
 	jnz	cksngq			;not WHILE, skip to sngqtk check
-	call	krnsvc			;WHILE found, save ":"
+	call	krnsav			;5.21: save token
 	mvi	a,plustk		;5.21: set to non-sngqtk value
 cksngq:	cpi	sngqtk			;single quoatation mark?
 	jnz	ntsngt
@@ -2678,9 +2687,7 @@ wuzoct:	call	krnsav			;save it
 	pop	b			;restore [b,c]
 	jmp	savint			;save the integer in the krunch buffer
 krnsvc:	mvi	a,':'			;get colon
-krnsav:
-					;in krunch buffer
-	stax	d			;save byte in krunch buffer
+krnsav:	stax	d			;save byte in krunch buffer
 	inx	d			;bump pointer
 	dcx	b			;decrement count of bytes left in buffer
 	mov	a,c			;test if it went to zero
@@ -2810,8 +2817,9 @@ lpform:	call	looper			;5.21: must have variable pointer in [d,e]
 	sphl				;do the elimination
 	shld	savstk			;update saved stack
 					;since a matching entry was found
-	mvi	c,0D1h			;5.21: constant before notol
-notol:	xchg				;[h,l]=text pointer
+	db	0Eh			;5.21: MVI C opcode
+notol:	pop	d			;5.21: D1 serves as MVI operand AND POP D
+	xchg				;[h,l]=text pointer
 	mvi	c,8			;make sure 16 bytes are available
 					;off of the stack
 	call	getstk
@@ -3982,7 +3990,7 @@ supprs:	call	sinlin
 varlop:	mvi	a,128			;don'T ALLOW SUBSCRIPTS -- RETURN POINTING TO "("
 	sta	subflg
 	call	chrgtr			;advance text pointer
-	call	ptrget			;scan name and return pointer in [d,e]
+	call	ptrglb			;5.21: scan name via stub
 	mov	a,m			;see if it ended on "("
 	dcx	h			;rescan the terminator
 	cpi	'['			;5.21: array subscript can use brackets
@@ -5019,7 +5027,7 @@ defusr:	call	scnusr			;scan the usr name
 	push	d			;save pointer to usrtab entry
 	call	synchr
 	db	equltk			;must have equal sign
-	call	getin2			;get the address
+	call	frmhqi			;5.21: get the address (full 16-bit range)
 	xthl				;text pointer to stack, get address
 	mov	m,e			;save usr call address
 	inx	h			;bump pointer
@@ -5812,11 +5820,11 @@ peek:	call	frqint			;get an integer in [h,l]
 	call	prodir			;dont allow direct if protected file
 	mov	a,m			;get the value to return
 	jmp	sngflt			;and float it
-poke:	call	frmevl			;read a formula
-	push	d			;5.21: save DE
-	call	frqint			;force value into int in [h,l]
+poke:	call	frmhqi			;evaluate address, get integer in [d,e]
+	push	d			;save address
 	call	prodir			;dont allow direct if protected file
-	db	44			;5.21: comma check inline
+	call	synchr
+	db	','			;check comma
 	call	getbyt
 	pop	d			;get the address back
 	stax	d			;store it away
@@ -5837,9 +5845,9 @@ frqint:	lxi	b,frcint		;return here
 	lda	fac			;get exponent
 	cpi	220o			;is magnitude .gt. 32767
 	rnz				;no, force integer
-	call	signc			;5.21: call signc instead of inline
+	call	sign			;5.21: get sign of FAC
 	rm				;assume thats what it is, else give overflow
-	call	0			;5.21: unknown call
+	call	frcsng			;5.21: force single precision
 	lxi	b,221q*256+200q
 	lxi	d,0*256+0		;get -65536.
 	jmp	fadd			;subtract it, and then force integer
@@ -6020,13 +6028,13 @@ chgptr:
 scnpop:	pop	h			;pop off current text pointer
 scnex3:	pop	d			;get back current line #
 	dcx	h			;backup pointer
-	jmp	scnext			;keep scanning
+scnex4:	jmp	scnext			;5.21: label for indirect jump
 
 linm:	dc	'Undefined line '
 	db	0
 
 scnpt2:	cpi	ptrcon			;pointer
-	jnz	scnext			;no, keep scanning
+	jnz	scnex4			;5.21: jump to jmp instruction, not directly to scnext
 	push	d			;save current line #
 	call	lingt3			;get #
 	push	h			;save text pointer

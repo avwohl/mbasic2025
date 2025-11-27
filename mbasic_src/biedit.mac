@@ -60,7 +60,7 @@ trurom	set	0
 ;
 ;*
 	public	erredt,edit,editrt,popart
-	extrn	buf,buflin,crdo,dot,edent,errflg,fininl,fndlin,inchri,outch1
+	extrn	buf,bufmin,buflin,crdo,dot,edent,errflg,fininl,fndlin,inchri,outch1
 	extrn	linprt,linspc,lisprt,makups,outdo,pophrt,ready,userr
 	extrn	bltuc,errlin
 erredt:	sta	errflg			;reset the flag to call edit
@@ -369,7 +369,7 @@ eed:	call	crdo			;type carriage return
 	ana	e
 	inr	a			;set zero if [d,e] = all ones.
 editrt:					;used by auto code
-	lxi	h,buf-1			;start krunching at buf
+	lxi	h,bufmin		;5.21: start krunching at buf (buf-1)
 	rz				;return to inlin if called from there
 	stc				;flag line # was seen to fool insert code
 	push	psw			;psw is on stack

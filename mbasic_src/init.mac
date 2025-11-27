@@ -86,7 +86,7 @@ initsa:
 	jmp	ready
 endio:	ds	2
 init:
-	lxi	h,tstack		;set up temp stack
+	lxi	h,stk3f			;5.21: set up temp stack (tstack+63)
 	sphl	
 	xra	a			;initialize protect flag
 	extrn	proflg
@@ -228,7 +228,7 @@ isslh:	cpi	swtchr			;option?
 fndslh:	mvi	m,0			;store terminator over "/"
 scansw:	call	chrgtr			;get char after slash
 	extrn	makupl
-	call	makupl			;5.21: convert to uppercase
+scns1a:	call	makupl			;5.21: convert to uppercase (jump here to skip chrgtr)
 scans1:
 	cpi	'S'			;is it /s: ? (set max record size)
 	jz	wass			;yes
@@ -259,7 +259,7 @@ fok:	dcx	h			;rescan last char
 	jz	doncmd			;end of command
 	call	synchr
 	db	swtchr			;slash should follow
-	jmp	scans1			;scan next switch
+	jmp	scns1a			;5.21: scan next switch (include makupl)
 wass:	call	chrgtr			;get char after "S"
 	call	synchr
 	db	':'			;make sure colon follows
@@ -414,5 +414,9 @@ heding:
 lastwr::				;last word of system code+1
 	ds	7	;space for temp stack (5.21 uses only 7 bytes)
 tstack:
+	public	stk3f,stk40,stka3	;5.21: symbols for tstack+offset (avoids 8-char truncation)
+stk3f	equ	tstack+63		;5.21: for initial stack pointer
+stk40	equ	tstack+64		;for txttab initial value
+stka3	equ	tstack+163		;for topmem initial value
 					;make sure last word punched is ok
 	end	

@@ -53,7 +53,7 @@ trurom	set	0
 
 	extrn	clsfil,conint,datofs,derbfn,derrpe,error,filou3,chrgtr,curlin
 	extrn	indskb,indskc,nmlofs,prgfil,scrtch,snerr
-	extrn	frmeql,buf
+	extrn	frmeql,buf,bufmin
 	extrn	strlt3,derfov
 	extrn	datofc,derbfm,dirtmp,doasig,docnvf,dsctmp,errfdr,fcerr
 	extrn	filpt1,filptr,fin,finbck,finprt,frcstr,frestr,fretop
@@ -304,7 +304,7 @@ bakupt:	lhld	ptrfil			;go to number of charaters
 	inr	m			;back up by incrementing character count
 noskcr:	pop	h			;get back place to store terminator
 quit2b:	mvi	m,0			;store the terminator
-	lxi	h,buf-1			;item is now stored at this point +1
+	lxi	h,bufmin		;5.21: item is now stored at this point +1 (buf-1)
 	mov	a,e			;was it a numeric input?
 	sui	' '			;if so, [e]=" "
 	jz	numimk			;use fin to scan it
@@ -706,7 +706,7 @@ lset:	stc				;set carry if lset
 	call	dcompr			;will getspa garbage collect?
 	jc	makdsc			;yes, better have stringexp temp.
 madesc:	pop	psw
-	mov	a,c			;get length of stringvar
+madsc1:	mov	a,c			;5.21: entry point without pop psw
 	call	getspa			;get space for result
 	pop	h			;get stringvar descr.
 	pop	b			;get lengths off stack
@@ -790,7 +790,7 @@ makdsc:	pop	psw			;get temp flag
 makds1:	xthl
 	push	b
 	push	h			;restore stack to previous state
-	jmp	madesc			;5.21: no push psw
+	jmp	madsc1			;5.21: no push psw, skip pop psw
 	page
 	subttl	program i/o -- fixed length input
 
