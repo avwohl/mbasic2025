@@ -403,8 +403,8 @@ lngnam:
 	jz	optb0			;if base 0 do nothing
 	mov	a,d			;check for 0 subscript
 	ora	e			;which is illegal in base 1
+	jz	bserr			;5.21: jz before dcx
 	dcx	d			;adjust subscript
-	jz	bserr
 optb0:
 	pop	b			;pop off the looks
 	pop	psw			;[a] = number of dimensions so far
@@ -716,9 +716,9 @@ matsub:	push	d			;this routine tries to perform a match
 slpmat:	dcr	b			;matched all characters yet?
 	jz	ismat2			;if so, its a match
 	ldax	d			;get another character
+	inx	d			;5.21: advance DE before compare
 	cmp	m			;see if its the same
 	inx	h			;move forward in definition table
-	inx	d			;more forward in stored name
 	jz	slpmat			;if match keep going until end
 	mov	a,b			;need to advance by [b]-1 to skip bad chars
 	dcr	a

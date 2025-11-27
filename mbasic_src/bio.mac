@@ -86,9 +86,10 @@ lptcod:	lda	prtflg			;see if we want to talk to lpt
 	cpi	8			;backspace?
 	jnz	ntbks2			;no
 	lda	lptpos			;get lpt pos
-	dcr	a			;subtract one from printer posit
+	sui	1			;5.21: subtract 1, set carry if was 0
+	jc	lptbks			;skip store if was 0
 	sta	lptpos			;correct lptpos
-	pop	psw			;get back backspace
+lptbks:	pop	psw			;5.21: restore char
 	jmp	lptchr			;send char
 ntbks2:	cpi	9			;tab
 	jnz	notabl			;no
@@ -117,7 +118,7 @@ notabl:
 	cmp	m			;set cc'S
 	pop	h			;then do crlf
 	cz	printw			;do crlf
-	jz	lptch1			;if forced cr, leave lptpos at zero
+					;5.21: no jz here - falls through to cpi 255
 zerlpt:
 	cpi	255			;max length?
 	jz	lptch1			;then just print
@@ -161,13 +162,12 @@ ttychr:
 	cpi	8			;backspace?
 	jnz	ntbks1			;no
 	lda	ttypos			;get tty pos
-	ora	a			;set cc'S
-	jz	morspr			;return
-	dcr	a			;decrment posit by one
-	sta	ttypos			;correct ttypos
-					;correct ttypos
-	mvi	a,8			;get back backspace char
-	jmp	tryout			;send it
+	ora	a			;5.21: test if zero (NOT sui like LPT!)
+	jz	morspr			;if zero, exit without output
+	dcr	a			;decrement ttypos
+	sta	ttypos			;store new ttypos
+	mvi	a,8			;restore backspace char
+	jmp	tryout			;send it to output
 ntbks1:	cpi	9			;outputting tab?
 	jnz	notab			;no.
 morsp:	mvi	a,32			;get space char
@@ -193,7 +193,7 @@ notab:
 	public	linpt1
 linpt1	set	$-1
 	cz	crdo			;type crlf and set ttypos and [a]=0 if so
-	jz	tryout			;if forced crlf, leave ttypos at zero
+					;5.21: no jz here - falls through to cpi 255
 inctps:
 	cpi	255			;have we hit max #?
 	jz	tryout			;then leave it there
@@ -214,7 +214,7 @@ noprin:					; end of phlz80 off
 	push	b			;save all regs
 	push	d
 	push	h
-	ani 127 ;???
+					;5.21: no ani 127 here
 	mov	c,a			;cpm wants char in [c]
 	public	conout
 conout:	call	0			;cpm (bios) entry point
@@ -252,12 +252,14 @@ inchr:
 	extrn	lstfre
 	lda	lstfre			;run it or not?
 	ora	a
+	jz	norun			;5.21: jz before lxi
 	extrn	newstt
 	lxi	h,newstt
-	xthl	
+	push	h			;5.21: push instead of xthl
 	extrn	runc
-	jnz	runc			;run it
-	xthl	
+	jmp	runc			;5.21: jmp instead of jnz
+norun:
+	push	h			;5.21: push h, not xthl
 	push	b			;preserve registers
 	push	d
 	extrn	reddy

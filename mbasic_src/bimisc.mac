@@ -51,7 +51,7 @@ trurom	set	0
 	page
 	title	bimisc	basic interpreter miscellaneous routines/whg/pga etc.
 	extrn	arytab,brktxt,crdo,crdonz,curlin,datptr,error,fadds
-	extrn	fcerr,fcomp,fndfor,fndlin,fretop,frmevl,inchri,inlin,linget
+	extrn	fcerr,fcomp,fndfor,fndlin,fretop,frmevl,frmhqi,inchri,inlin,linget
 	extrn	memsiz,movfm,movmf,movrm,newstt,oldlin,oldtxt,overr,ptrget
 	extrn	snerr,strend,subflg,outdo,savtxt,chrcon
 
@@ -128,8 +128,8 @@ cons1	set	256-(2*numlev)
 	mov	l,a
 	mvi	a,255
 	sbb	h
+	mov	h,a			;5.21: mov h,a before jc
 	jc	omerr			;in case [h,l] was too big(mbm 3/18**)
-	mov	h,a			;now see if [sp] is larger
 	dad	sp			;if so, carry will be set
 	pop	h			;get back original [h,l]
 	rc				;was ok?
@@ -406,9 +406,11 @@ reserr:	lxi	d,0+errcn		;"CAN'T CONTINUE"
 	jz	error
 	xchg				;save [h,l]
 	lhld	oldlin
+	xchg				;5.21: redundant xchg pair in original
+	xchg
 	shld	curlin			;set up old line # as current line #
-	xchg				;restore [h,l] 
-	ret	
+	xchg				;restore [h,l]
+	ret
 	extrn	nulcnt
 	public	null
 null:	call	getbyt
@@ -438,7 +440,8 @@ swap:	call	ptrget			;[d,e]=pointer at value #1
 	db	44			;make sure the variables are
 					;delimited by a comma
 	call	ptrget			;[d,e]=pointer at value #2
-	pop	b			;[b]=type of value #1
+	pop	psw			;5.21: pop psw, then mov b,a
+	mov	b,a			;[b]=type of value #1
 	call	getypr			;[a]=type of value #2
 	cmp	b			;make sure they are the same
 	jnz	tmerr			;if not, "TYPE MISMATCH" error
@@ -460,7 +463,8 @@ swap:	call	ptrget			;[d,e]=pointer at value #1
 	call	vmove			;transfer swptmp=value #1 into value #2'S
 					;old position
 	pop	h			;get the text pointer back
-	ret	
+	ret
+	jmp	fcerr			;5.21: unreachable code in original
 	public	erase
 erase:
 	mvi	a,1
@@ -513,8 +517,9 @@ islet:	mov	a,m
 islet2:	cpi	'A'
 	rc				;if less than "A", return early
 	cpi	91			;91="Z"+1
-	cmc	
-	ret	
+	cmc
+	ret
+	jmp	clearc			;5.21: unreachable code in original
 	subttl	clear
 ;
 ; this code is for the "CLEAR" command with an argument
@@ -538,14 +543,7 @@ cskpcm:	call	synchr
 	xchg	
 	cpi	54o
 	jz	clears			;should finish there
-	call	frmevl			;evaluate formula
-	push	h			;save text pointer
-	call	frqint			;convert to integer in [h,l]
-	mov	a,h
-	ora	l			;memory size =0?
-	jz	fcerr##			;yes, error
-	xchg				;value to [d,e]
-	pop	h			;restore text pointer
+	call	clrhlp			;5.21: call helper subroutine
 clears:	dcx	h			;back up
 	call	chrgtr			;get char
 	push	d			;save new high mem
@@ -577,6 +575,13 @@ cleart:	xthl				;save text pointer
 	shld	topmem			;set it up, must be ok
 	pop	h			;regain the text pointer
 	jmp	clearc			;go clear
+;5.21: helper subroutine for CLEAR formula evaluation
+clrhlp:	call	frmhqi			;call helper at 22D1
+	mov	a,d
+	ora	e
+	jz	fcerr			;error if zero
+	ret
+	jmp	omerr			;5.21: unreachable code
 cdfstk:	push	h			;save text pointer
 	lhld	topmem			;figure out current stack size so
 	xchg				;it is saved
