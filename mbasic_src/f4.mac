@@ -2102,7 +2102,7 @@ ppa10:	pop	b
 					;alters all registers
 ddiv:	lda	arg			;check for division by zero
 	ora	a			;get the exponent of arg
-	jz	intdv0
+	jz	indv0a			;5.21: jumps directly to indv0a
 	lda	fac			;if fac=0 then ans is zero
 	ora	a
 	jz	zero
@@ -2546,23 +2546,21 @@ ovfina:	call	move			;move into fac
 ovfinb:
 	lhld	onelin			;trapping errors?
 	mov	a,h
-	ora	l
-	jnz	ovftrp			;5.21: jnz to trap handler
-	pop	psw			;
-	lxi	h,ovrmsg		;put "OVRMSG" address in overri
-	shld	overri			;in case this was a div by 0
+	ora	l			;Z flag set if not trapping
+	lhld	overri			;get old overflow msg ptr
+	lxi	d,ovrmsg		;new msg ptr
+	xchg				;hl=ovrmsg, de=old overri
+	shld	overri			;always store ovrmsg
+	jz	noodtp			;if not trapping, exit
+	call	dcompr			;compare old ptr with ovrmsg
+	jz	overr			;if was ovrmsg, overflow error
+	jmp	dv0err			;else division by zero
+noodtp:
+	pop	psw			;restore regs and return
 	pop	d
 	pop	b
-	pop	h			;all restored
-	ret				;continue processing
-ovftrp:
-	lhld	overri
-	lxi	d,ovrmsg
-	call	dcompr
-	lxi	h,ovrmsg
-	shld	overri
-	jz	overr
-	jmp	dv0err
+	pop	h
+	ret
 infp:	db	377o
 	db	377o
 	db	177o
@@ -2571,19 +2569,7 @@ infm:	db	377o
 	db	377o
 	db	377o
 	db	377o
-intdv0:	push	h			;get arg sign byte
-	push	d			;
-	lxi	h,dfaclo
-	lxi	d,infm			;all one'S
-	call	move
-	lda	infm			;377
-	sta	dfaclo+2		;(previously 177)
-	call	getypr
-	jpo	indv0a			;not d.p. load arg sign
-	lda	fac-1
-	jmp	intdv2
-
-
+;intdv0 removed - 5.21 doesn't have this routine
 
 	page
 	subttl	floating point output routine
@@ -3840,6 +3826,14 @@ posexp:	ora	a
 	call	movrf			;get y in the registers
 					;end intfsw contittonal
 	jp	fpwr1			;no problems if x is positive
+;5.21: skip integer check if exponent too large
+	push	psw			;save flags
+	lda	fac			;get exponent
+	cpi	99h			;is it >= 99h?
+	jc	fpwr0			;if < 99h, do integer check
+	pop	psw			;else restore flags
+	jmp	fpwr1			;and skip to fpwr1
+fpwr0:	pop	psw			;restore flags
 	push	d
 	push	b
 					;save y
@@ -3925,8 +3919,7 @@ exp110:
 exp115:	jmp	ovfin6			;overflow
 exp200:	lxi	b,201q*256+000q
 	lxi	d,000q*256+000q		;1.
-	call	movfr
-	ret	
+	jmp	movfr			;5.21: tail call optimization
 ;*************************************************************
 ;	hart 1302 polynomial coefficients
 ;*************************************************************

@@ -231,6 +231,11 @@ snfuns:	lhld	arytab			;stopping point is [aryta2]
 	lhld	vartab			;set up starting point
 	jmp	lopfnd
 
+;5.21: stub for varptr call - return address used as marker
+	public	ptrglb,ptrrtn
+ptrglb:	call	ptrget
+ptrrtn:	ret
+
 ; this is exit for varptr and others
 varnot:
 	mov	d,a			;zero [d,e]
@@ -242,17 +247,10 @@ varnot:
 smkvar:	pop	h			;[h,l]= text pointer
 	xthl				;[h,l]= return address
 	push	d			;save current variable table position
-	extrn	varret
-	lxi	d,varret		;are we returning to varptr?
+	lxi	d,ptrrtn		;5.21: check against ptrglb return addr
 	call	dcompr			;compare
 	jz	varnot			;yes.
-	extrn	comptr,compt2		;return here if not found
-	lxi	d,comptr
-	call	dcompr
-	jz	varnot
-	lxi	d,compt2		;2nd one
-	call	dcompr
-	jz	varnot
+;5.21: comptr/compt2 checks not in original binary
 	lxi	d,retvar		;did eval call us?
 	call	dcompr			;if so, don'T MAKE A NEW VARIABLE
 	pop	d			;restore the position

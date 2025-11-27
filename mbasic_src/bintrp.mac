@@ -4591,7 +4591,8 @@ nterl:
 	pop	h			;restore text ptr
 	jmp	varret
 nvrfil:
-	call	ptrget			;get address of variable
+	extrn	ptrglb
+	call	ptrglb			;5.21: call via stub for return addr
 	public	varret
 varret:	call	synchr
 	db	')'			;eat right paren
