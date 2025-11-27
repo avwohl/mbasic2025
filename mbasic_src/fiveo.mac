@@ -100,8 +100,10 @@ wend:	jnz	snerr			;statement has no arguments
 	shld	savstk
 	xchg				;save [h,l] pointing into stack entry
 	lhld	curlin			;remember wend line #
+	xchg				;5.21: redundant swap pair
+	xchg				;5.21: swap back
 	shld	nxtlin			;in nxtlin
-	xchg	
+	xchg
 	inx	h			;index into stack entry to get values
 	inx	h			;skip over text pointer of wend
 	mov	e,m			;set [d,e]=text pointer of while
@@ -129,8 +131,8 @@ fnwend:	call	frmevl			;evaluate formula
 flswhl:	lhld	nxtlin			;setup curlin for wend
 	shld	curlin
 	pop	h			;take off text of wend as new text pointer
-	pop	psw			;get rid of text pointer of while
-	pop	psw			;take off line number of while
+	pop	b			;5.21: get rid of text pointer of while
+	pop	b			;5.21: take off line number of while
 	jmp	newstt
 ;
 ; this subroutine searches the stack for an while entry
@@ -154,11 +156,10 @@ fndwn3:	lxi	b,0+$while
 	cmp	c
 	rnz	
 	push	h
-	mov	c,m			;pick up the wend text pointer
+	mov	a,m			;5.21: pick up the wend text pointer into A
 	inx	h
-	mov	b,m
-	mov	h,b
-	mov	l,c
+	mov	h,m			;5.21: high byte into H
+	mov	l,a			;5.21: low byte into L
 	call	dcompr
 	pop	h
 	lxi	b,0+whlsiz
@@ -365,7 +366,9 @@ chmwdl:	push	psw			;save all flag
 fcerrg:	jnc	fcerr			;if not, "Illegal function call"
 	pop	psw			;flag that says whether to go to dncmda
 	jnz	dncmda			;"ALL" option was present
-ntchal:	lhld	txttab			;start searching for commons at program start
+ntchal:	lhld	curlin			;5.21: save current line
+	push	h			;5.21: on stack
+	lhld	txttab			;start searching for commons at program start
 	dcx	h			;compensate for next instr
 clpsc1:	inx	h			;look at first char of next line
 clpscn:	mov	a,m			;get char from program
@@ -422,9 +425,14 @@ comptr:	mov	a,d			;if var not found, [d,e]=0
 	mov	a,b			;try to find in common
 	ori	128			;set common bit
 	mov	b,a
+	lxi	d,compt2		;5.21: push return address
+	push	d
+	extrn	ptrrtn
+	lxi	d,ptrrtn		;5.21: push parameter for noarys
+	push	d
 	lda	valtyp			;must have valtyp in [d]
 	mov	d,a
-	call	noarys			;search symbol table
+	jmp	noarys			;5.21: jump instead of call
 compt2:	mov	a,d			;found?
 	ora	e
 	jz	fcerr			;no, who is this guy?
@@ -465,7 +473,10 @@ chkcst:	call	synchr
 	db	54o			;force comma to appear here
 	jmp	nxtcom			;get next common variable
 ; step 3 - squeeze..
-clpfin:	lhld	arytab			;end of simple var squeeze
+clpfin:	pop	h			;5.21: restore curlin from ntchal push
+	shld	curlin			;5.21: store it back
+	xchg				;5.21: redundant swap
+	lhld	arytab			;end of simple var squeeze
 	xchg				;to [d,e]
 	lhld	vartab			;start of simps
 clpslp:	call	dcompr			;are we done?
@@ -514,7 +525,8 @@ dlsvlp:	call	dcompr			;done?
 	mov	l,c
 	shld	strend			;store it
 	ret	
-dncmds:	lhld	strend			;limit of array search
+dncmds:	xchg				;5.21: redundant swap
+	lhld	strend			;limit of array search
 	xchg				;to [d,e]
 clpakp:	call	dcompr			;done?
 	jz	dncmda			;yes
@@ -599,13 +611,13 @@ caystr:	xchg				;save current position in [d,e]
 	jz	cayvar			;get next array
 	lxi	b,caystr		;do next str in array
 	push	b			;save branch address on stack
-cdvars:	xra	a			;get length of array and
-	ora	m			;set cc's on VALTYP
+cdvars:	mov	a,m			;5.21: get length from memory into A
 	inx	h			;also pick up pointer into [d,e]
 	mov	e,m
 	inx	h
 	mov	d,m
 	inx	h			;[h,l] points after descriptor
+	ora	a			;5.21: test length
 	rz				;ignore null strings
 	push	h			;save where we are
 	lhld	vartab			;is string in program text or disk buffers?
@@ -633,8 +645,9 @@ dnccls:	call	garba2			;get rid of unused strings
 	lhld	strend			;load end of vars
 	mov	b,h			;into [b,c]
 	mov	c,l
+	xchg				;5.21: redundant swap
 	lhld	vartab			;start of simps into [d,e]
-	xchg	
+	xchg
 	lhld	arytab
 	mov	a,l			;get length of simps in [h,l]
 	sub	e
@@ -658,6 +671,8 @@ dnccls:	call	garba2			;get rid of unused strings
 	mov	c,l
 	lhld	cmeptr			;end of lines to delete
 	call	del			;delete the lines
+	shld	arytab			;5.21: store new arytab
+	shld	strend			;5.21: store new strend
 	call	linker			;re-link lines just in case
 ; step 6 - load new program
 ntmdlt:	mvi	a,1			;set chain flag
@@ -695,12 +710,13 @@ mvbkvr:	call	dcompr			;done?
 	mov	h,b			;[h,l]=last var byte
 	mov	l,c
 	shld	strend			;this is new end
+	xchg				;5.21: save current DE
 	lhld	chnlin			;get chain line #
-	mov	a,h			;test for zero
-	ora	l
-	xchg				;put in [d,e]
+	xchg				;5.21: DE = chnlin, HL = old
 	lhld	txttab			;get prog start in [h,l]
 	dcx	h			;point at zero before program
+	mov	a,d			;5.21: test DE (chnlin) for zero
+	ora	e
 	jz	newstt			;line #=0, go...
 	call	fndlin			;try to find destination line
 	jnc	userr			;not there...

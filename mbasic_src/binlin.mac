@@ -196,7 +196,7 @@ ntctlr:
 					;philips must echo controls
 goodch:	mov	a,b			;get current length
 					;*** special check if buffer 255 long for len2
-	inr	a			;bump line length
+	ora	a			;5.21: test if non-zero
 	extrn	ptrfil,linget,curlin
 	jnz	outbnd			;no cause for bell
 	push	h			;save [h,l]

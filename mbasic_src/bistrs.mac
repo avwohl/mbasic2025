@@ -95,7 +95,8 @@ strcmp:	call	frestr			;free up the fac string, and get the
 	call	fretmp			;free up the stack string and return
 					;the pointer to the stack string descriptor
 					;in [h,l]
-	pop	d			;[d]=length of fac string
+	pop	psw			;5.21: restore fac string length to A
+	mov	d,a			;5.21: move length to D
 	mov	e,m			;[e]=length of stack string
 	inx	h
 	mov	c,m			;[b,c]=pointer at stack string
@@ -356,13 +357,12 @@ skpvar:	mov	e,a
 	dad	d
 	jmp	svar			;get next one
 aryvar:	lhld	temp9			;get link in parameter block chain
-	mov	a,m			;go back one level
+	mov	e,m			;5.21: load into DE instead of HL
 	inx	h
-	mov	h,m
-	mov	l,a
-	ora	h			;was that the end?
-	xchg				;setup to start arrays
-	lhld	arytab
+	mov	d,m
+	mov	a,d			;5.21: test DE properly
+	ora	e			;was that the end?
+	lhld	arytab			;5.21: no xchg needed
 	jz	aryva4			;otherwise garbage collect arrays
 	xchg	
 	shld	temp9			;setup next link in chain for iteration
@@ -449,8 +449,8 @@ dvars:	xra	a
 ;
 grbpas:	pop	d			;pop off max pointer
 	pop	h			;and get variable pointer
-	mov	a,l			;get low in
-	ora	h			;see if zero pointer
+	mov	a,h			;5.21: get high byte first
+	ora	l			;see if zero pointer
 	rz				;if end of collection,
 					;then maybe return to getspa
 	dcx	h			;currently just past the descriptor
@@ -475,8 +475,8 @@ grbpas:	pop	d			;pop off max pointer
 	mov	m,c			;save fixed addr
 	inx	h			;move pointer
 	mov	m,b			;high part
-	mov	l,c
-	mov	h,b			;[h,l]=new pointer
+	mov	h,b			;5.21: high first
+	mov	l,c			;[h,l]=new pointer
 	dcx	h			;fix up fretop
 	jmp	fndvar			;and try to find high again
 
@@ -1044,8 +1044,9 @@ fre:
 	call	frefac			;free up argument and setup
 					;to give free string space
 	call	garba2			;do garbage collection
-clcdif:	lhld	strend
-	xchg	
+clcdif:	xchg				;5.21: swap first
+	lhld	strend
+	xchg
 	lhld	fretop			;top of free area
 	jmp	givdbl			;return [h,l]-[d,e]
 	end	

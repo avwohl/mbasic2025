@@ -95,10 +95,10 @@ filget:	cpi	'#'			;number sign there?
 gdfilm:
 	call	synchr
 	db	44			;go past the comma
-filset:	xchg				;[d,e]=text pointer
-	mov	h,b			;setup ptrfil
-	mov	l,c
-	shld	ptrfil
+filset:	mov	d,b			;5.21: copy BC to DE first
+	mov	e,c
+	xchg				;[d,e]=text pointer, [h,l]=file ptr
+	shld	ptrfil			;setup ptrfil
 	xchg				;text pointer back into [h,l]
 	ret	
 
@@ -183,12 +183,12 @@ cvd:	mvi	a,7			;double precision value type -1
 	cmp	m			;make sure the string is longer than that
 	jnc	fcerr			;if not, "ILLEGAL FUNCTION CALL"
 	inr	a			;[a]=true value type
+	sta	valtyp			;5.21: setup value type first
 	inx	h
-	mov	c,m			;[h,l]=pointer at string data
+	mov	a,m			;5.21: get low byte into A
 	inx	h			;to be moved into the fac
 	mov	h,m
-	mov	l,c
-	sta	valtyp			;setup value type for move
+	mov	l,a			;5.21: put low byte into L
 					;and for identification
 	jmp	vmovfm			;move in the string data
 

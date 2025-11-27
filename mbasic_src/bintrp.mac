@@ -5822,7 +5822,8 @@ poke:	call	frmevl			;read a formula
 	stax	d			;store it away
 	ret				;scanned everything
 ;5.21: helper routine for address evaluation
-	call	frmevl
+	public	frmhqi
+frmhqi:	call	frmevl
 	push	h
 	call	frqint
 	xchg

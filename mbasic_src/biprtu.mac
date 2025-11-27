@@ -83,7 +83,7 @@ inius:	push	h			;save the pointer to "USING" string descriptor
 	xra	a			;initially indicate there are more
 					;values in the value list
 	sta	usflg			;reset the flag that says values printed
-	cmp	d			;turn the zero flag off
+	inr	a			;5.21: A=1, turn zero flag off
 					;to indicate the value list hasn'T ENDED
 	push	psw			;save flag indicating whether the value
 					;list has ended
@@ -92,10 +92,10 @@ inius:	push	h			;save the pointer to "USING" string descriptor
 	ora	b			;see if its zero
 fcerr3:	jz	fcerr			;if so, "ILLEGAL FUNCTION CALL"
 	inx	h			;[h,l]=pointer at the "USING" string'S
-	mov	c,m			;data
+	mov	a,m			;5.21: use A as temp, not C
 	inx	h
 	mov	h,m
-	mov	l,c
+	mov	l,a
 	jmp	prcchr			;go into the loop to scan
 					;the "USING" string
 bgstrf:	mov	e,b			;save the "USING" string character count
@@ -339,13 +339,13 @@ crdnus:	pop	b			;[b]=characters remaining in "USING" string
 	mov	a,m			;get the "USING" string'S LENGTH
 	sub	b			;subtract the number of characters
 					;already scanned
-	inx	h			;[h,l]=pointer at
-	mov	c,m			;the "USING" string'S
-	inx	h			;string data
-	mov	h,m
-	mov	l,c
+	inx	h			;5.21: mvi d,0 before address fetch
 	mvi	d,0			;setup [d,e] as a double byte offset
 	mov	e,a
+	mov	a,m			;the "USING" string'S
+	inx	h			;string data
+	mov	h,m
+	mov	l,a			;5.21: use A as temp, not C
 	dad	d			;add on the offset to get
 					;the new pointer
 chkusi:	mov	a,b			;[a]=the number of characters left to scan
@@ -381,7 +381,7 @@ litchr:	call	plsprt			;print previous "+" if any
 ;
 ; here to handle variable length string field specified with "&"
 ;
-varstr:	mvi	c,255			;set length to maximum possible
+varstr:	mvi	c,0			;5.21: 0 means variable length
 	jmp	isstr1
 ;
 ; here when the "!" indicating a single character
@@ -409,15 +409,17 @@ isstr1:	dcr	b			;decrement the "USING" string character count
 	lhld	faclo			;get a pointer to the descriptor
 	mov	b,c			;[b]=field width
 	mvi	c,0			;set up for "LEFT$"
-	push	b			;save the field width for space padding
-	call	leftus			;truncate the string to [b] characters
+	mov	a,b			;5.21: save width in A
+	push	psw			;save the field width for space padding
+	mov	a,b			;get width again
+	ora	a			;test if zero
+	cnz	leftus			;5.21: call only if width non-zero
 	call	strprt			;print the string
 	lhld	faclo			;see if it needs to be padded
 	pop	psw			;[a]=field width
-	inr	a			;if field length is 255 must be "&" so
+	ora	a			;5.21: test for 0 (varstr uses 0, not 255)
 	jz	fnstrf			;dont print any trailing spaces
-	dcr	a
-	sub	m			;[a]=amount of padding needed
+	sub	m			;5.21: no dcr a - direct subtract
 	mov	b,a
 	mvi	a,' '			;setup the print character
 	inr	b			;dummy increment of number of spaces
