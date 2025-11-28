@@ -24,6 +24,7 @@ mbasic2025/
 ├── mbasic_52/          # Original MBASIC 5.2 sources (reference)
 ├── mbasic_521/         # recreated 5.21 sources
 ├── mbasicz/            # latest available, optimized for z80
+├── 4k8k/               # 4k basic and 8k basic
 │   ├── mbasic_src/     # Reconstructed 5.21 sources
 │   ├── com/            # Reference mbasic.com 5.21 binary
 │   ├── disasm/         # Disassembly of mbasic.com
