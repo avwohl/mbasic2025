@@ -1,0 +1,116 @@
+# Label mapping from BASIC 3.2 to BASIC 4.0
+# Format: 3.2_addr 4.0_addr label_name comment
+#
+# Analysis: BASIC 4.0 has a slightly different layout
+# - Keywords moved from 0x57 to 0x51 (6 bytes earlier)
+# - Some pointers changed
+# - Init routine moved from 0D21 to 0DE6 (+0xC5)
+# - Error codes moved from 0xFA to 0x100 (+6)
+# - Most code appears shifted by varying amounts
+#
+# RST vectors (same in both):
+0000 0000 Start          DI; JMP Init
+0008 0008 SyntaxCheck    RST 1 - check BASIC syntax
+0010 0010 NextChar       RST 2 - get next char
+0018 0018 OutChar        RST 3 - output character
+0020 0020 CompareHLDE    RST 4 - compare HL with DE
+0028 0028 FTestSign      RST 5 - test floating point sign
+0030 003B PushNextWord   RST 6 - push word from (HL)
+
+# System variables (adjusted for 4.0):
+0026 0026 TERMINAL_Y     cursor Y position
+0027 0027 TERMINAL_X     cursor X position
+003D 0043 KW_INLINE_FNS  function dispatch table
+004B ???? KW_ARITH_OP_FNS arithmetic operator table
+0057 0051 KEYWORDS       keyword table (high-bit terminated)
+00D2 00CC KW_GENERAL_FNS statement dispatch table
+00FA 0100 ERROR_CODES    two-letter error codes
+0113 011F LINE_BUFFER    input line buffer
+
+# Key variables:
+015B ???? DIM_OR_EVAL    flag
+015C ???? INPUT_OR_READ  flag
+015D ???? PROG_PTR_TEMP  temporary program pointer
+0161 ???? CURRENT_LINE   current executing line
+0163 ???? STACK_TOP      top of stack
+0165 ???? PROGRAM_BASE   start of BASIC program
+0167 ???? VAR_BASE       start of variables
+0169 ???? VAR_ARRAY_BASE start of arrays
+016B ???? VAR_TOP        end of variables
+016D ???? DATA_PROG_PTR  DATA statement pointer
+016F ???? FACCUM         floating point accumulator
+0173 ???? FTEMP          floating point temp
+0174 ???? FBUFFER        floating point buffer
+
+# Messages:
+0181 0189 szError        " ERROR\0"
+0188 0190 szIn           " IN \0"
+018D 0195 szOK           "\rOK\r\0"
+
+# Key routines - offsets need verification by code comparison:
+0192 019A GetFlowPtr     get FOR/NEXT stack frame
+01A7 01AF CopyMemoryUp   copy memory upward
+01B6 01BE CheckEnoughVarSpace
+01C3 ???? CheckEnoughMem check memory available
+01CD 01D3 OutOfMemory    OM error
+01D0 01D6 SyntaxError    SN error
+01D3 ???? DivideByZero   /0 error
+01D5 01DB Error          error handler
+01F7 01FD Stop           STOP statement
+01F9 01FF Main           main loop (not 0201?)
+01FF 0207 GetNonBlankLine
+
+# Program management:
+021C ???? StoreProgramLine
+027D ???? FindProgramLine
+0295 029D New            NEW command
+02A1 029E Run            RUN command
+02A2 ???? ResetAll
+02A6 02A9 Clear          CLEAR command
+02B5 02BD ResetStack
+
+# I/O:
+02C2 ???? InputLineWith  input with prompt
+033C 0349 InputLine
+036E ???? OutChar_tail
+0382 ???? InputChar
+038E 039F List           LIST command
+
+# Statements:
+03D5 03E3 For            FOR statement
+0421 ???? ExecNext       execute next statement
+043E ???? Exec           execute statement
+0469 ???? Restore        RESTORE statement
+0498 ???? FunctionCallError FC error
+049D ???? LineNumberFromStr parse line number
+04BE ???? Gosub          GOSUB statement
+04CF ???? Goto           GOTO statement
+04DF ???? Return         RETURN statement
+04F5 ???? FindNextStatement skip to :
+04F7 ???? Rem            REM statement
+0502 ???? Let            LET statement
+0516 ???? If             IF statement
+0557 ???? Print          PRINT statement
+
+# Math:
+080A 0818? FSub           float subtract
+0810 081E? FAdd           float add
+08E3 ???? FMul           float multiply
+092F ???? FDiv           float divide
+09E4 ???? Sgn            SGN function
+09F8 ???? Abs            ABS function
+09FA ???? FNegate        negate float
+0AA2 ???? Int            INT function
+0AB3 ???? FIn            input float
+0B37 ???? PrintInt       print integer
+0B42 ???? FOut           output float
+0C21 0C2F Sqr            SQR function
+0C5F 0C6D Rnd            RND function
+0C95 0CA0 Sin            SIN function
+
+# Initialization:
+0D21 0DE6 Init           initialization entry
+0E1B ???? DoOptionalFns  SIN/RND/SQR prompts
+0E47 ???? InitProgramBase
+0EB4 0EDF szTerminalWidth "TERMINAL WIDTH\0"
+0EF0 0EEE szMemorySize    "MEMORY SIZE\0"
