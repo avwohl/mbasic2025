@@ -15,16 +15,6 @@ cd "$(dirname "$0")"
 
 echo "=== Building 4K BASIC 4.0 ==="
 
-# Step 1: Generate disassembly if needed
-if [ "$1" = "--regenerate" ] || [ ! -f 4kbas40_new.mac ] || [ 4kbas40.bin -nt 4kbas40_new.mac ]; then
-    echo "Generating disassembly..."
-    ./disasm_4k.sh
-fi
-
-# Step 2: Apply fixes for overlapping instructions
-echo "Applying fixes..."
-python3 fix_overlaps.py 4kbas40_new.mac 4kbas40.mac
-
 # Step 3: Assemble
 echo "Assembling..."
 python3 -m um80.um80 4kbas40.mac -o 4kbas40.rel

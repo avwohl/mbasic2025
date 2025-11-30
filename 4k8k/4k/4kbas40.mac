@@ -392,7 +392,7 @@ Error:
 	RST	2		; Advance HL, get second char
 	RST	3		; Print it
 	LXI	HL,szError	; Point to " ERROR" string
-	CALL	PrintStr	; Print it
+	CALL	PrintString	; Print it
 	LHLD	CURRENT_LINE	; Get current line number
 	MOV	A,H		; Check if in direct mode (FFFF)
 	ANA	L
@@ -417,7 +417,7 @@ StopCont:
 ;=============================================================================
 Main:
 	LXI	HL,szOK		; Point to "\rOK\r" string
-	CALL	PrintStr	; Print "OK" prompt
+	CALL	PrintString	; Print "OK" prompt
 ;-----------------------------------------------------------------------------
 ; GetNonBlankLine - Get a line of input from the user
 ;-----------------------------------------------------------------------------
@@ -733,7 +733,7 @@ InputNext:
 	CALL	GetChar		; Get character from terminal
 	MOV	C,A		; Save in C
 	CPI	0DH		; Carriage return?
-	JZ	TerminateLine	; Done if CR
+	JZ	TerminateInput	; Done if CR
 	CPI	'@'		; Line cancel?
 	JZ	LineCancel
 	CPI	'_'		; Backspace?
