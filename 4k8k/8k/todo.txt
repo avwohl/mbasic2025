@@ -1,0 +1,69 @@
+There were three versions of basic:
+ 4Kbute ../4k
+ 8kbyte this directory, just starting
+ disk extended ../../mbasic_521/mbasic_src
+We disassembled and commented the 4k and 8k
+In terms of features this 8k is half way between
+4k and extended.
+The job is to full comment the code and name the labels
+of this 8k basic.
+This 8kbas.bin runs on bare metal (not under cp/m)
+It loads and starts and 0h
+Techniques:
+ - for both the 4k (especially for RST usage) and extended basic
+ match patterns in this code with the other commented basics.
+ Many routines are believed to be the same for example, floating
+ point add,subtract, multiple, divide. parse/print floats.
+
+ - the ~/cl/cpmemu/src/altair_emu can run it. see below
+ The emulator has a --trace option. you may need to add a command
+ to turn on/off and flush the trace buffer.  The way you can use it now
+ is to write a basic program that uses all the features and run it under trace.
+ It will give you a list of addresses that where executed as code and a list
+ fetched as data.
+ 
+**** phase 1 run altair_emu and a basic program to use all feature
+with trace. Make up a diasm file ala ../disam4k.sh
+Fill in the -d (data) ranges and -l code entries. See ud80 --help
+Currently lots of locations show up db that should be code, or a jump table
+
+**** phase 2 after the code vs data is sorted out go to pattern matching
+this basic to the two commented (4k and disk) basics to pull in as many
+comments as possible
+
+**** phase 3 read the uncommented code and figure out what it does
+
+*** possible phase 2a - extend ud80 to allow in its ^E console to turn on and off trace.
+Then turn on trace and get a trace of running clear, 100 j=j+2.3
+save trace.
+Then trace on run clear, 100 j=j*2.3
+Then compare two different math routines should be executed. Drop the comming
+parts of the trace and one of the uniqs is floating point add and the other floating point multiple.
+Likewise setup a function test and try sin,cos, tan, and so on to locate the code for each function
+Other features wont be as localized , but writing while/end loop then change to for/next should be of use
+
+**** sample run of the basic we are working on in an emulator:
+wohl@awohl6:~/mbasic2025/4k8k/8k$ ~/cl/cpmemu/src/altair_emu 8kbas.bin
+CPU mode: 8080
+Console escape: ^E (Ctrl+E)
+Loaded 8192 bytes from 8kbas.bin at 0x0000
+Starting execution at 0x0000
+
+MEMORY SIZE? 
+TERMINAL WIDTH? 
+WANT SIN-COS-TAN-ATN? 
+WANT SIN-COS-TAN-ATN? y
+WANT SIN-COS-TAN-ATN? Y
+
+59012 BYTES FREE
+ALTAIR BASIC REV. 4.0
+[EIGHT-K VERSION]
+COPYRIGHT 1976 BY MITS INC.
+OK
+
+[Console mode - ^E to enter, 'help' for commands]
+PC=0558
+sim> q
+[Exiting...]
+
+Total instructions executed: 124391773
