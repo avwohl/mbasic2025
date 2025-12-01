@@ -22,6 +22,7 @@ first	set	0
 	endm
 	endm
 
+	aseg
 	org	0000H
 
 ;=============================================================================
@@ -112,9 +113,9 @@ FTestSign:
 ; The first 8 bytes (RST 6 slot) set up and jump to continuation.
 ;=============================================================================
 	db	0E3H		; XTHL - get return address into HL
-	db	22H		; SHLD PushRet+1 (store return address)
-	db	low PushRet+1
-	db	high PushRet+1
+	db	22H		; SHLD PushRetAddr (store return address)
+	db	low PushRetAddr
+	db	high PushRetAddr
 	db	0E1H		; POP HL - restore original HL
 	db	0C3H		; JMP PushNextWord
 	db	low PushNextWord
@@ -134,7 +135,8 @@ PushNextWord:
 	inx	hl		; Advance HL past the word
 	push	bc		; Push the word onto stack
 PushRet:
-	jmp	PushRet		; Self-modifying: jump to return address
+PushRetAddr	equ	$+1		; Self-modified: return address
+	jmp	PushRet		; (operand patched at runtime)
 ;=============================================================================
 ; Function Pointer Tables for Inline Functions
 ; These are the math functions that can be used in expressions (SGN, INT, etc.)
@@ -345,7 +347,7 @@ GetFlowLoop:
 ; Used to make room for inserting program lines.
 ;=============================================================================
 CopyMemoryUp:
-	call	CheckEnoughMem+1 ; Skip MVI A,E5H - enters at PUSH HL (E5 byte)
+	call	CheckEnoughMemPushHL ; Entry at E5 byte (PUSH HL)
 	push	bc		; Exchange BC and HL
 	xthl
 	pop	bc
@@ -376,6 +378,7 @@ CheckEnoughVarSpace:
 ; If not, falls through to OutOfMemory error.
 ;=============================================================================
 CheckEnoughMem:
+CheckEnoughMemPushHL	equ	$+1	; Entry +1: E5 byte executes as PUSH HL
 	mvi	a,0E5H		; Calculate FFDE - HL (-34 bytes margin)
 	mvi	a,0DEH		; (Self-modifying: first byte overwritten)
 	sub	l
@@ -416,7 +419,7 @@ Error:
 	rst	2		; Advance HL, get second char
 	rst	3		; Print it
 	lxi	hl,szError	; Point to " ERROR" string
-	call	PrintString+1	; Print it (skip INX HL)
+	call	PrintStringLoop	; Print it (skip INX HL)
 	lhld	CURRENT_LINE	; Get current line number
 	mov	a,h		; Check if in direct mode (FFFF)
 	ana	l
@@ -674,7 +677,7 @@ NextKeyword:
 	inr	b		; Increment keyword ID
 	mov	a,m		; Get keyword char
 	ani	7FH		; Mask off bit 7
-	jz	NotKeyword+1	; If zero, end of keyword table (skip first XCHG)
+	jz	NotKeywordNoSwap ; If zero, end of keyword table
 	cmp	c		; Compare to input char
 	jnz	NextKeyword	; Try next keyword if no match
 	; First char matches - check rest of keyword
@@ -701,6 +704,7 @@ NotKeyword_cleanup:
 NotKeyword:
 	; Entry point when keyword not found (jumps here skipping MOV C,B; POP PSW)
 	xchg			; Restore pointers
+NotKeywordNoSwap:			; Entry +1: skip first XCHG (end of table case)
 	xchg
 	mov	a,c		; A = character/keyword to output
 	pop	bc		; Restore saved BC
@@ -851,6 +855,7 @@ ListNextLine:
 ;-----------------------------------------------------------------------------
 ListChar:
 	rst	3		; DF - Print character in A
+ListCharNext:				; Entry +1: skip RST 3 (char already printed)
 	mov	a,m		; 7E - Get next character
 	ora	a		; B7 - Test for null (end of line)
 	inx	hl		; 23 - Advance pointer
@@ -881,9 +886,9 @@ PrintKeyword:
 	db	0F2H		; JP PrintKeyword (loop)
 	db	low PrintKeyword
 	db	high PrintKeyword
-	db	0C3H		; JMP ListChar+1 (back to main loop, skip RST 3)
-	db	low (ListChar+1)
-	db	high (ListChar+1)
+	db	0C3H		; JMP ListCharNext (back to main loop, skip RST 3)
+	db	low ListCharNext
+	db	high ListCharNext
 ;=============================================================================
 ; FOR Handler
 ; Although FOR indicates the beginning of a loop, the handler only gets called
@@ -936,7 +941,7 @@ ForNoReuse:
 	mvi	a,01H		; Default direction = forward
 	jnz	PushStepValue	; If no STEP, use default 1.0
 	; STEP clause present - evaluate it
-	call	ArithParse+1	; Skip token and evaluate STEP
+	call	ArithParseLoop	; Skip token and evaluate STEP
 	push	hl		; Save program pointer
 	call	FCopyToBCDE	; Get STEP value into BCDE
 	rst	5		; Test sign of STEP (sets A to direction)
@@ -1591,6 +1596,7 @@ PopHLRet:
 ;-----------------------------------------------------------------------------
 EvalVarTerm:
 	call	GetVar		; Get variable address in DE
+EvalVarTermPush	equ	$		; Address checked by FAssign (+3)
 	push	hl		; Save program pointer
 	xchg			; HL = variable address
 	call	FLoadFromMem	; Load variable value into FACCUM
@@ -1683,7 +1689,7 @@ AllocNewVar:
 	pop	hl		; HL = prog ptr
 	xthl			; (SP) = prog ptr, HL = return address
 	push	de		; Save DE
-	lxi	de,EvalVarTerm+3 ; Address inside EvalTerm
+	lxi	de,EvalVarTermPush ; Address inside EvalVarTerm
 	rst	4		; Compare return address
 	pop	de		; Restore DE
 	jz	CalledFromEval	; If from evaluator, don't allocate
@@ -1816,7 +1822,7 @@ StoreArraySize:
 	; Check memory and update VAR_TOP
 	push	hl		; Save ptr to array data area
 	dad	de		; HL = new VAR_TOP
-	call	CheckEnoughMem+1 ; Make sure it fits (enter at PUSH HL)
+	call	CheckEnoughMemPushHL ; Entry at E5 byte (PUSH HL)
 	shld	VAR_TOP		; Update VAR_TOP
 	pop	de		; DE = array data start
 ; Initialize all array elements to zero
@@ -1843,7 +1849,7 @@ FWordToFloat:
 	mov	d,b		; D = low byte
 	mvi	e,0		; E = 0 (low mantissa)
 	mvi	b,90H		; Exponent = 2^16 (144 decimal)
-	jmp	FCharToFloat+5	; Continue in conversion routine
+	jmp	FCharToFloat2	; Continue in conversion routine
 
 ;-----------------------------------------------------------------------------
 ; FAddMem - Add 0.5 to FACCUM (for rounding)
@@ -1963,6 +1969,7 @@ FNormaliseLoop:
 ;-----------------------------------------------------------------------------
 FRoundUp:
 	mov	a,b		; A = extra mantissa byte
+FRoundUpNoB:				; Entry +1: skip MOV A,B (A already set)
 	lxi	hl,FACCUM_EXP	; Point to exponent
 	ora	a		; If bit 7 of extra byte set
 	cm	FMantissaInc	; Round up the mantissa
@@ -2074,6 +2081,7 @@ FMantissaRtLoop:
 ;-----------------------------------------------------------------------------
 FMantissaRtOnce:
 	mov	a,c		; Shift C right
+FMantissaRtNoC:				; Entry +1: skip MOV A,C (continue shift)
 	rar
 	mov	c,a
 	mov	a,d		; Shift D right with carry
@@ -2100,9 +2108,9 @@ FMul:	rst	5		; FTestSign - check if RHS is zero
 	call	FExponentAdd
 	; Store LHS mantissa in self-modifying code locations
 	mov	a,c
-	sta	FMulInnerLoop+13 ; High byte of LHS mantissa
+	sta	FMulLHSHigh	; High byte of LHS mantissa
 	xchg
-	shld	FMulInnerLoop+8	; Low two bytes of LHS mantissa
+	shld	FMulLHSLow	; Low two bytes of LHS mantissa
 	; Initialize result mantissa to 0
 	lxi	bc,0
 	mov	d,b
@@ -2129,13 +2137,15 @@ FMulInnerLoop:
 	jnc	FMulNoAdd	; Skip add if bit was 0
 	; Add LHS mantissa to result
 	push	hl
-	lxi	hl,0		; Self-modified: LHS low bytes
+FMulLHSLow	equ	$+1		; Self-modified: LHS low bytes (+8)
+	lxi	hl,0		; (operand patched at runtime)
 	dad	de
 	pop	de
-	aci	0		; Self-modified: LHS high byte
+FMulLHSHigh	equ	$+1		; Self-modified: LHS high byte (+13)
+	aci	0		; (operand patched at runtime)
 	xchg
 FMulNoAdd:
-	call	FMantissaRtOnce+1 ; Shift result right
+	call	FMantissaRtNoC	; Shift result right (skip MOV A,C)
 	dcr	l		; Count bits
 	mov	a,h		; Restore RHS byte
 	jnz	FMulInnerLoop
@@ -2171,13 +2181,13 @@ FDiv:	rst	5		; FTestSign - check if RHS (divisor) is zero
 	; Store RHS mantissa in self-modifying code locations
 	dcx	hl
 	mov	a,m
-	sta	FDivLoop+12	; High byte
+	sta	FDivDivisorHigh	; High byte
 	dcx	hl
 	mov	a,m
-	sta	FDivLoop+8	; Middle byte
+	sta	FDivDivisorMid	; Middle byte
 	dcx	hl
 	mov	a,m
-	sta	FDivLoop+4	; Low byte
+	sta	FDivDivisorLow	; Low byte
 	; Initialize for long division
 	mov	b,c		; B = LHS high mantissa byte
 	xchg			; HL = LHS low mantissa
@@ -2185,27 +2195,31 @@ FDiv:	rst	5		; FTestSign - check if RHS (divisor) is zero
 	mov	c,a		; Initialize result mantissa to 0
 	mov	d,a
 	mov	e,a
-	sta	FDivLoop+15	; Initialize carry byte
+	sta	FDivCarryByte	; Initialize carry byte
 ; Long division loop
 FDivLoop:
 	push	hl		; Save dividend
 	push	bc
 	; Subtract divisor from dividend (self-modifying operands)
 	mov	a,l
-	sui	0		; Self-modified: divisor low byte
+FDivDivisorLow	equ	$+1		; Self-modified: divisor low byte (+4)
+	sui	0		; (operand patched at runtime)
 	mov	l,a
 	mov	a,h
-	sbi	0		; Self-modified: divisor middle byte
+FDivDivisorMid	equ	$+1		; Self-modified: divisor middle byte (+8)
+	sbi	0		; (operand patched at runtime)
 	mov	h,a
 	mov	a,b
-	sbi	0		; Self-modified: divisor high byte
+FDivDivisorHigh	equ	$+1		; Self-modified: divisor high byte (+12)
+	sbi	0		; (operand patched at runtime)
 	mov	b,a
-	mvi	a,0		; Self-modified: carry byte
+FDivCarryByte	equ	$+1		; Self-modified: carry byte (+15)
+	mvi	a,0		; (operand patched at runtime)
 	sbi	0
 	cmc			; Complement carry for comparison
 	jnc	FDivNoSubtract
 	; Subtraction succeeded - keep result
-	sta	FDivLoop+15	; Update carry
+	sta	FDivCarryByte	; Update carry
 	pop	psw		; Discard old values
 	pop	psw
 	stc			; Set carry for quotient bit
@@ -2218,7 +2232,7 @@ FDivNoSubtract:
 	inr	a		; Test if normalized
 	dcr	a
 	rar			; Shift carry into result
-	jm	FRoundUp+1	; Done if normalized (skip MOV A,B)
+	jm	FRoundUpNoB	; Done if normalized (A already set)
 	ral			; Undo the shift
 	call	FMantissaLeft	; Shift result left
 	; Shift dividend left (multiply by 2)
@@ -2226,9 +2240,9 @@ FDivNoSubtract:
 	mov	a,b
 	ral
 	mov	b,a
-	lda	FDivLoop+15	; Shift carry byte
+	lda	FDivCarryByte	; Shift carry byte
 	ral
-	sta	FDivLoop+15
+	sta	FDivCarryByte
 	; Check if dividend is zero
 	mov	a,c
 	ora	d
@@ -2306,6 +2320,7 @@ FMulByTen:
 ;-----------------------------------------------------------------------------
 FTestSign_tail:
 	lda	FACCUM+2	; Get sign byte
+FTestSignCMA	equ	$+1		; Entry +4: 2FH = CMA (complement A)
 	cpi	2FH		; Compare to determine sign
 	ral			; Rotate sign into carry
 	sbb	a		; A = -1 if negative, 0 if positive
@@ -2458,7 +2473,7 @@ FCompareWithBCDE:
 	mov	a,b		; Check if BCDE is zero
 	ora	a
 	jz	FTestSign	; If zero, result depends on FACCUM sign
-	lxi	hl,FTestSign_tail+4 ; Return address for sign check (into CPI's operand)
+	lxi	hl,FTestSignCMA	; Return address: 2FH = CMA opcode
 	push	hl
 	rst	5		; FTestSign - check FACCUM
 	mov	a,c		; Get BCDE sign
@@ -2611,6 +2626,7 @@ FInScaleEnd:
 ; Multiply by 10 helper (for positive scaling)
 FInMulTen:
 	rz			; Return if A = 0
+FInMulTenNoRZ:				; Entry +1: skip RZ (unconditional multiply)
 	push	psw
 	call	FMulByTen
 	pop	psw
@@ -2655,7 +2671,7 @@ FInExpAccum:
 PrintIN:
 	push	hl
 	lxi	hl,szIn		; " IN " string
-	call	PrintString+1	; Skip INX HL
+	call	PrintStringLoop	; Print (HL already at first char)
 	pop	hl
 ;-----------------------------------------------------------------------------
 ; PrintInt - Print integer in HL (converts to float and prints)
@@ -2665,7 +2681,7 @@ PrintInt:
 	xchg			; DE = integer value
 	xra	a		; C = 0
 	mvi	b,98H		; B = exponent 24 (2^24)
-	call	FCharToFloat+5	; Convert to float (skip sign handling)
+	call	FCharToFloat2	; Convert to float (skip sign handling)
 	lxi	hl,PrintString	; Return to PrintString after FOut
 	push	hl
 ;-----------------------------------------------------------------------------
@@ -2697,7 +2713,7 @@ FOutOver100K:
 	call	FCompareWithBCDE
 	jpo	FOutPrepare	; If FACCUM >= 100000, continue
 	pop	psw		; Get decimal exponent adjustment
-	call	FInMulTen+1	; Multiply by 10, decrement adjustment (skip RZ)
+	call	FInMulTenNoRZ	; Multiply by 10, decrement adjustment
 	push	psw
 	jmp	FOutOver100K
 ; Divide by 10 and increment exponent adjustment
@@ -2902,7 +2918,7 @@ Rnd:	rst	5		; FTestSign - check argument
 	dcx	hl
 	mov	b,m		; Save exponent
 	mvi	m,80H		; Set exponent = 0 (value < 1)
-	call	FNormalise+3	; Normalize result
+	call	FNormaliseNoNeg	; Normalize result (skip negation)
 	; Save new seed and return
 	lxi	hl,RND_SEED
 	jmp	FCopyToMem	; Store new seed and return
@@ -3131,7 +3147,7 @@ Init:	lxi	hl,0F40H	; Default top of memory (3904 bytes)
 ; Ask user for memory size
 AskMemorySize:
 	lxi	hl,szMemorySize	; "MEMORY SIZE"
-	call	PrintString+1	; Skip INX HL
+	call	PrintStringLoop	; Print (HL already at first char)
 	call	InputLineWithQ	; Get user input with "? " prompt
 	jc	AskMemorySize	; Retry on error
 	rst	2		; NextChar
@@ -3165,7 +3181,7 @@ GotMemoryTop:
 ;-----------------------------------------------------------------------
 AskTerminalWidth:
 	lxi	hl,szTerminalWidth
-	call	PrintString+1	; Skip INX HL
+	call	PrintStringLoop	; Print (HL already at first char)
 	call	InputLineWithQ	; Get input with "?" prompt
 	jc	AskTerminalWidth ; On break, ask again
 	rst	2		; NextChar - get first char
@@ -3205,7 +3221,7 @@ OptFnLoop:
 	jz	OptFnDone	; Yes, done with optional functions
 	rst	6		; PushNextWord - get prompt string address
 	xthl			; HL = prompt string, stack has descriptor ptr
-	call	PrintString+1	; Print "WANT xxx" (skip INX HL)
+	call	PrintStringLoop	; Print prompt (HL already at first char)
 	call	InputLineWithQ	; Get Y/N response
 	rst	2		; NextChar - get first char of response
 	pop	hl		; Restore descriptor pointer
@@ -3240,7 +3256,7 @@ InitComplete:
 	sphl			; Set stack pointer to memory top
 	shld	STACK_TOP	; Save stack top
 	xchg			; HL = program base, DE = stack top
-	call	CheckEnoughMem+1 ; Verify enough space (enter at PUSH HL)
+	call	CheckEnoughMemPushHL ; Entry at E5 byte (PUSH HL)
 	; Calculate free bytes: (stack_top - program_base) - 16
 	mov	a,e		; DE still has stack top
 	sub	l
@@ -3252,10 +3268,10 @@ InitComplete:
 	dad	bc		; HL = free bytes
 	call	PrintInt	; Print free byte count
 	lxi	hl,szBytesFree	; " BYTES FREE" message
-	call	PrintString+1	; Skip INX HL (HL already points to first char)
+	call	PrintStringLoop	; Print (HL already at first char)
 	; Patch startup code for subsequent runs
-	lxi	hl,PrintString+1 ; After first run, Main should call
-	shld	0205H		;   PrintString+1 (skip INX HL)
+	lxi	hl,PrintStringLoop ; After first run, Main should call
+	shld	0205H		;   PrintStringLoop (skip INX HL)
 	call	Run		; Initialize variables (NEW without msg)
 	; Redirect cold start to warm start
 	lxi	hl,Main		; Future starts go to Main
