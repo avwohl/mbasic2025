@@ -106,7 +106,7 @@ KEYWORDS:	DC	'E'	; 0051: C5
 	DC	'SRS'	; 00C0: 53 52 D3
 	DC	'QRR'	; 00C3: 51 52 D2
 	DC	'NDS'	; 00C6: 4E 44 D3
-	DC	'IN'	; 00C9: 49 4E
+	DB	'IN'	; 00C9: 49 4E (last char NOT high bit - terminator follows)
 	DB	80H	; 00CB
 KW_GENERAL_FNS:	DW	Stop	; 00CC: FD 01
 	DW	For	; 00CE: E3 03
@@ -792,6 +792,8 @@ Return:	RNZ	; 04ED: C0
 	LXI	HL,L042F	; 04FF: 21 2F 04
 	XTHL	; 0502: E3
 FindNextStatement:	LXI	BC,0E3AH	; 0503: 01 3A 0E
+; Rem enters at $-1 (MVI C,00) - overlapping instruction trick
+Rem	EQU	$-1
 	NOP	; 0506: 00
 FindStmtLoop:	MOV	A,M	; 0507: 7E
 	ORA	A	; 0508: B7
