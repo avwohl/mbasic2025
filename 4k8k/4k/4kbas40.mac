@@ -693,7 +693,7 @@ KwCompare:
 
 KwMatch:
 	; Keyword matched - B has keyword ID (with bit 7 already set)
-	db	048H		; MOV C,B - save keyword ID in C
+	mov	c,b		; Save keyword ID in C
 	; Fall through to cleanup code
 NotKeyword_cleanup:
 	pop	psw		; Clean up stack (discard saved position)
@@ -858,33 +858,23 @@ ListCharNext:				; Entry +1: skip RST 3 (char already printed)
 	jz	ListNextLine	; CA xx xx - If null, go to next line
 	jp	ListChar	; F2 xx xx - If bit 7 clear, continue
 	; Bit 7 set - keyword token handler (overlapping instruction trick)
-	db	0D6H, 07FH	; SUI 7FH - Convert token to index
-	db	04FH		; MOV C,A - Save count in C
-	db	011H		; LXI DE,KEYWORDS
-	db	low KEYWORDS
-	db	high KEYWORDS
+	sui	07fh		; Convert token to index
+	mov	c,a		; Save count in C
+	lxi	d,KEYWORDS
 ToNextKeyword:
-	db	01AH		; LDAX DE - Get keyword char
-	db	013H		; INX DE - Advance
-	db	0B7H		; ORA A - Test bit 7
-	db	0F2H		; JP ToNextKeyword (self-ref)
-	db	low ToNextKeyword
-	db	high ToNextKeyword
-	db	00DH		; DCR C - Decrement counter
-	db	0C2H		; JNZ ToNextKeyword (if not found)
-	db	low ToNextKeyword
-	db	high ToNextKeyword
+	ldax	d		; Get keyword char
+	inx	d		; Advance
+	ora	a		; Test bit 7
+	jp	ToNextKeyword	; Loop until bit 7 set (end of keyword)
+	dcr	c		; Decrement counter
+	jnz	ToNextKeyword	; If not found, keep searching
 PrintKeyword:
-	db	0DFH		; RST 3 - Print char
-	db	01AH		; LDAX DE - Get next keyword char
-	db	013H		; INX DE - Advance
-	db	0B7H		; ORA A - Test bit 7
-	db	0F2H		; JP PrintKeyword (loop)
-	db	low PrintKeyword
-	db	high PrintKeyword
-	db	0C3H		; JMP ListCharNext (back to main loop, skip RST 3)
-	db	low ListCharNext
-	db	high ListCharNext
+	rst	3		; Print char
+	ldax	d		; Get next keyword char
+	inx	d		; Advance
+	ora	a		; Test bit 7
+	jp	PrintKeyword	; Loop until bit 7 set
+	jmp	ListCharNext	; Back to main loop, skip RST 3
 ;=============================================================================
 ; FOR Handler
 ; Although FOR indicates the beginning of a loop, the handler only gets called
@@ -1862,8 +1852,8 @@ FAddMem_load:
 ; Overlapping instruction trick: Entry at FSub-2 pops BC/DE from stack
 ;-----------------------------------------------------------------------------
 FSubEntry:
-	db	0C1H		; POP BC (or part of LXI operand when skipped)
-	db	0D1H		; POP DE (or part of LXI operand when skipped)
+	pop	bc		; (or part of LXI operand when skipped)
+	pop	de		; (or part of LXI operand when skipped)
 FSub:	call	FNegate		; Negate RHS
 FAddEntry	equ	$+1	; Entry point at C1 D1 (POP BC; POP DE when jumped to)
 	lxi	hl,0D1C1H	; Skip to FAdd (C1 D1 operand = POP BC; POP DE trick)

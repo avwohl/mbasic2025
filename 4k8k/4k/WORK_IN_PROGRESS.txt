@@ -1,0 +1,65 @@
+# Work in Progress - 4K BASIC Disassembly Fix
+
+## Status
+Fixing 4kbas40.mac to compile and produce an exact binary match with 4kbas40.bin.
+
+## Current State (Updated)
+- File compiles to 3833 bytes (matches reference size)
+- 88 address relocation differences remaining
+- All non-address differences (opcode/data bytes) have been fixed
+- Only address bytes differ due to data section being 1 byte too large
+
+## Fixed Issues This Session
+1. FMul/FDiv confusion: Lines 2812, 2876 - changed CALL FMul to CALL FDiv
+2. PrintSpaceLoop: Line 1297 - changed JMP PrintSpaces to JMP PrintSpaceLoop
+3. FTestSign_tail offset: Line 2414 - changed FTestSign_tail-1 to FTestSign_tail+4
+4. ClearVars: Line 487 - changed CALL ResetAll to CALL ClearVars
+5. TryNextKeyword: Added label and changed JMP target (lines 623, 651)
+6. FDivLoop+15: Changed all FDivLoop+18 to FDivLoop+15 (self-modifying code offset)
+7. FAddMem label: Moved label from CALL to LXI HL instruction
+8. FAddMem_load: Line 1432 - changed CALL FAddMem to CALL FAddMem_load
+
+## Remaining Issue - Address Drift
+The data area has 5 DWs (10 bytes) of reserved space at 0x0160-0x0169.
+The reference has only 9 bytes (0x0160-0x0168).
+This causes all data labels to be 1 byte higher than reference:
+- DIM_OR_EVAL: 0x016A instead of 0x0169
+- FACCUM: 0x0178 instead of 0x0177
+- FACCUM_EXP: 0x017B instead of 0x017A (used by FTestSign)
+
+## Address Difference Patterns
+- diff=+1: 53 occurrences (data references shifted +1)
+- diff=+2: 14 occurrences (high byte carry from +1 shifts)
+- diff=-1: 11 occurrences (code references - investigating)
+- diff=-2: 10 occurrences (code references - investigating)
+
+## Key Observations
+1. All code bytes (excluding addresses) match exactly between ref and built
+2. Removing 1 byte from data section makes file 3832 bytes (1 too short)
+3. This suggests there's 1 extra byte somewhere else compensating
+4. Need to find where this extra byte is
+
+## Files
+- 4kbas40.mac - Main source being fixed
+- 4kbas40_new.mac - Working reference (produces exact match)
+- 4kbas40.bin - Reference binary (3833 bytes)
+- /tmp/new.lst - Listing from 4kbas40_new.mac
+
+## Commands
+```bash
+# Build and test
+python3 -m um80.um80 4kbas40.mac -o 4kbas40.rel
+python3 -m um80.ul80 4kbas40.rel -o 4kbas40_built.bin -p 0
+cmp 4kbas40.bin 4kbas40_built.bin
+
+# View listing
+python3 -m um80.um80 4kbas40.mac -o 4kbas40.rel -l 4kbas40.lst
+
+# Check differences
+python3 -c "
+with open('4kbas40.bin','rb') as f: ref=f.read()
+with open('4kbas40_built.bin','rb') as f: built=f.read()
+for i in range(len(ref)):
+    if ref[i]!=built[i]: print(f'0x{i:04x}: ref=0x{ref[i]:02x} built=0x{built[i]:02x}')
+"
+```
