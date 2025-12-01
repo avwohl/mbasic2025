@@ -91,14 +91,28 @@ FTestSign:
 	RET			; Return with A=0, Z set
 
 ;=============================================================================
-; RST 6 - PushNextWord
+; RST 6 - PushNextWord (0x0030-0x0037)
 ; Effectively PUSH (HL). Pushes the 16-bit value pointed to by HL onto stack.
 ; Uses self-modifying code for the return jump.
+; The first 8 bytes (RST 6 slot) set up and jump to continuation.
 ;=============================================================================
+	DB	0E3H		; XTHL - get return address into HL
+	DB	22H		; SHLD PushRet+1 (store return address)
+	DB	LOW PushRet+1
+	DB	HIGH PushRet+1
+	DB	0E1H		; POP HL - restore original HL
+	DB	0C3H		; JMP PushNextWord
+	DB	LOW PushNextWord
+	DB	HIGH PushNextWord
+;-----------------------------------------------------------------------------
+; RST 7 slot (0x38-0x3A) - Data bytes for I/O patching
+;-----------------------------------------------------------------------------
+	DB	0C9H		; RET opcode byte (used for I/O config)
+	DW	0154H		; Additional I/O configuration bytes
+;-----------------------------------------------------------------------------
+; PushNextWord continuation (0x003B)
+;-----------------------------------------------------------------------------
 PushNextWord:
-	XTHL			; Get return address into HL
-	SHLD	PushRet+1	; Store return address in jump instruction
-	POP	HL		; Restore original HL
 	MOV	C,M		; Load low byte
 	INX	HL
 	MOV	B,M		; Load high byte
@@ -117,61 +131,29 @@ KW_INLINE_FNS:
 	DW	FunctionCallError ; USR - user function (not impl in 4K)
 	DW	Sqr		; SQR - square root
 	DW	Rnd		; RND - random number
-	DW	Sin		; SIN - sine function
+SinEntry:
+	DB	0A0H		; Sin function entry byte
+KW_INLINE_FNS_END:
+	DB	0CH		; End marker for inline functions
 
 ;=============================================================================
-; Keyword String Table
-; All keywords stored with last character having bit 7 set.
+; Keyword String Table - exact bytes from reference binary
+; Each keyword has its LAST character with high bit set as end marker.
 ; Token values start at 80H for END, 81H for FOR, etc.
+; Format uses overlapping suffixes for compact storage.
 ;=============================================================================
 KEYWORDS:
-; General keywords (tokens 80H-93H)
-	DB	'EN','D'+80H	; 80 - END
-	DB	'FO','R'+80H	; 81 - FOR
-	DB	'NEX','T'+80H	; 82 - NEXT
-	DB	'DAT','A'+80H	; 83 - DATA
-	DB	'INPU','T'+80H	; 84 - INPUT
-	DB	'DI','M'+80H	; 85 - DIM
-	DB	'REA','D'+80H	; 86 - READ
-	DB	'LE','T'+80H	; 87 - LET
-	DB	'GOT','O'+80H	; 88 - GOTO
-	DB	'RU','N'+80H	; 89 - RUN
-	DB	'I','F'+80H	; 8A - IF
-	DB	'RESTOR','E'+80H ; 8B - RESTORE
-	DB	'GOSU','B'+80H	; 8C - GOSUB
-	DB	'RETUR','N'+80H	; 8D - RETURN
-	DB	'RE','M'+80H	; 8E - REM
-	DB	'STO','P'+80H	; 8F - STOP
-	DB	'PRIN','T'+80H	; 90 - PRINT
-	DB	'LIS','T'+80H	; 91 - LIST
-	DB	'CLEA','R'+80H	; 92 - CLEAR
-	DB	'NE','W'+80H	; 93 - NEW
-
-; Supplementary keywords (tokens 94H-97H)
-	DB	'TAB',28H+80H	; 94 - TAB(
-	DB	'T','O'+80H	; 95 - TO
-	DB	'THE','N'+80H	; 96 - THEN
-	DB	'STE','P'+80H	; 97 - STEP
-
-; Arithmetic/logical operators (tokens 98H-9EH)
-	DB	'+'+80H		; 98 - +
-	DB	'-'+80H		; 99 - -
-	DB	'*'+80H		; 9A - *
-	DB	'/'+80H		; 9B - /
-	DB	'>'+80H		; 9C - >
-	DB	'='+80H		; 9D - =
-	DB	'<'+80H		; 9E - <
-
-; Inline function keywords (tokens 9FH-A5H)
-	DB	'SG','N'+80H	; 9F - SGN
-	DB	'IN','T'+80H	; A0 - INT
-	DB	'AB','S'+80H	; A1 - ABS
-	DB	'US','R'+80H	; A2 - USR
-	DB	'SQ','R'+80H	; A3 - SQR
-	DB	'RN','D'+80H	; A4 - RND
-	DB	'SI','N'+80H	; A5 - SIN
-
-	DB	0		; Null terminator for keyword table
+	DB	0C5H, 04EH, 044H, 0C6H, 04FH, 052H, 0CEH, 045H, 058H, 054H, 0C4H, 041H
+	DB	054H, 041H, 0C9H, 04EH, 050H, 055H, 054H, 0C4H, 049H, 04DH, 0D2H, 045H
+	DB	041H, 044H, 0CCH, 045H, 054H, 0C7H, 04FH, 054H, 04FH, 0D2H, 055H, 04EH
+	DB	0C9H, 046H, 0D2H, 045H, 053H, 054H, 04FH, 052H, 045H, 0C7H, 04FH, 053H
+	DB	055H, 042H, 0D2H, 045H, 054H, 055H, 052H, 04EH, 0D2H, 045H, 04DH, 0D3H
+	DB	054H, 04FH, 050H, 0D0H, 052H, 049H, 04EH, 054H, 0CCH, 049H, 053H, 054H
+	DB	0C3H, 04CH, 045H, 041H, 052H, 0CEH, 045H, 057H, 0D4H, 041H, 042H, 028H
+	DB	0D4H, 04FH, 0D4H, 048H, 045H, 04EH, 0D3H, 054H, 045H, 050H, 0ABH, 0ADH
+	DB	0AAH, 0AFH, 0BEH, 0BDH, 0BCH, 0D3H, 047H, 04EH, 0C9H, 04EH, 054H, 0C1H
+	DB	042H, 053H, 0D5H, 053H, 052H, 0D3H, 051H, 052H, 0D2H, 04EH, 044H, 0D3H
+	DB	049H, 04EH, 080H	; 80H marks end of SIN and keyword table
 ;=============================================================================
 ; General Keyword Function Pointer Table
 ; Indexed by (token - 80H) * 2 to get function address
@@ -204,13 +186,13 @@ KW_GENERAL_FNS:
 ;=============================================================================
 KW_ARITH_OP_FNS:
 	DB	79H		; + precedence
-	DW	FAdd		; + function
+	DW	FAddEntry	; + function (entry point with POP BC/DE)
 	DB	79H		; - precedence
-	DW	FSub		; - function
+	DW	FSubEntry	; - function (entry point with POP BC/DE)
 	DB	7CH		; * precedence (higher than +/-)
-	DW	FMul		; * function
+	DW	FMulEntry	; * function (entry point with POP BC/DE)
 	DB	7CH		; / precedence
-	DW	FDiv		; / function
+	DW	FDivEntry	; / function (entry point with POP BC/DE)
 
 ;=============================================================================
 ; Error Code Table
@@ -261,7 +243,7 @@ EXPR_STACK:	DW	0D92H		; Expression evaluation stack pointer
 	DW	0		; Reserved
 	DW	0		; Reserved
 	DW	0		; Reserved
-	DW	0		; Reserved
+	DB	0		; Reserved (odd byte to match reference)
 DIM_OR_EVAL:	DB	0		; Flag: 0=evaluating, NZ=DIM'ing
 INPUT_OR_READ:	DB	0		; Flag: 0=INPUT, NZ=READ
 PROG_PTR_TEMP:	DW	0		; Temporary program pointer
@@ -279,8 +261,8 @@ FACCUM_EXP:	DB	0		; FACCUM exponent
 
 FTEMP_SIGN:	DB	0		; Temp sign during FP operations
 
-; FBUFFER - 12 byte buffer used by FOut and Sqr
-FBUFFER:	DS	12		; Float output/sqrt buffer
+; FBUFFER - 13 byte buffer used by FOut and Sqr
+FBUFFER:	DS	13		; Float output/sqrt buffer
 
 ;=============================================================================
 ; More String Constants
@@ -321,7 +303,7 @@ GetFlowLoop:
 ; Used to make room for inserting program lines.
 ;=============================================================================
 CopyMemoryUp:
-	CALL	CheckEnoughMem	; Make sure there's room
+	CALL	CheckEnoughMem+1 ; Skip MVI A,E5H - enters at PUSH HL (E5 byte)
 	PUSH	BC		; Exchange BC and HL
 	XTHL
 	POP	BC
@@ -392,7 +374,7 @@ Error:
 	RST	2		; Advance HL, get second char
 	RST	3		; Print it
 	LXI	HL,szError	; Point to " ERROR" string
-	CALL	PrintString	; Print it
+	CALL	PrintString+1	; Print it (skip INX HL)
 	LHLD	CURRENT_LINE	; Get current line number
 	MOV	A,H		; Check if in direct mode (FFFF)
 	ANA	L
@@ -417,7 +399,7 @@ StopCont:
 ;=============================================================================
 Main:
 	LXI	HL,szOK		; Point to "\rOK\r" string
-	CALL	PrintString	; Print "OK" prompt
+	CALL	Init		; First time: Init (patched to PrintString after)
 ;-----------------------------------------------------------------------------
 ; GetNonBlankLine - Get a line of input from the user
 ;-----------------------------------------------------------------------------
@@ -502,7 +484,7 @@ CopyLine:
 ; UpdateLinks - Rebuild program line linked list
 ;-----------------------------------------------------------------------------
 UpdateLinks:
-	CALL	ResetAll	; Reset to start of program
+	CALL	ClearVars	; Reset to start of program
 	INX	HL
 	XCHG
 UpdateLinkLoop:
@@ -606,6 +588,7 @@ ResetStack:
 ; InputLineWithPrompt - Get Input with "? " Prompt
 ; Used by INPUT statement
 ;=============================================================================
+InputLineWithQ:
 InputLineWithPrompt:
 	MVI	A,'?'		; Print "? " prompt
 	RST	3
@@ -637,6 +620,7 @@ TokenLoop:
 	LXI	DE,KEYWORDS-1	; Point to keyword table
 	PUSH	BC		; Save current char
 	MVI	B,7FH		; Initialize keyword ID counter
+TryNextKeyword:
 	MOV	C,M		; Get input char (redundant but part of original)
 	MOV	C,M
 	XCHG			; HL = keyword ptr, DE = input ptr
@@ -648,14 +632,14 @@ NextKeyword:
 	INR	B		; Increment keyword ID
 	MOV	A,M		; Get keyword char
 	ANI	7FH		; Mask off bit 7
-	JZ	NotKeyword	; If zero, end of keyword table
+	JZ	NotKeyword+1	; If zero, end of keyword table (skip first XCHG)
 	CMP	C		; Compare to input char
 	JNZ	NextKeyword	; Try next keyword if no match
 	; First char matches - check rest of keyword
 	XCHG			; DE = keyword ptr, HL = input ptr
 	PUSH	HL		; Save input position
-	INX	DE		; Advance keyword ptr
 KwCompare:
+	INX	DE		; Advance keyword ptr
 	LDAX	DE		; Get keyword char
 	ORA	A		; Check bit 7 (end of keyword)
 	JM	KwMatch		; Jump if matched entire keyword
@@ -664,20 +648,19 @@ KwCompare:
 	CMP	C		; Compare
 	JZ	KwCompare	; Continue if match
 	POP	HL		; Restore input position
-	JMP	NextKeyword	; Try next keyword
+	JMP	TryNextKeyword	; Try next keyword
 
 KwMatch:
-	POP	PSW		; Discard saved input position
-	MOV	A,B		; A = keyword ID
-	ORI	80H		; Set bit 7 (token marker)
-	JP	WriteToken	; (Always jumps - LXI trick continues)
+	; Keyword matched - B has keyword ID (with bit 7 already set)
+	DB	048H		; MOV C,B - save keyword ID in C
+	; Fall through to cleanup code
+NotKeyword_cleanup:
+	POP	PSW		; Clean up stack (discard saved position)
 NotKeyword:
-	; Not a keyword - output the literal character
-	MOV	C,B		; Restore char from B
-	POP	PSW		; Clean up stack
+	; Entry point when keyword not found (jumps here skipping MOV C,B; POP PSW)
 	XCHG			; Restore pointers
 	XCHG
-	MOV	A,C		; A = character to output
+	MOV	A,C		; A = character/keyword to output
 	POP	BC		; Restore saved BC
 	POP	DE		; Restore output pointer
 WriteToken:
@@ -760,16 +743,21 @@ EchoChar:
 ;=============================================================================
 OutChar_tail:
 	CPI	72		; Check column position
+TERMINAL_WIDTH	EQU	OutChar_tail+1	; Terminal width operand (patched by Init)
 	CZ	NewLine		; Newline if at end
 	INR	A		; Increment column
 	STA	TERMINAL_X	; Save column
 WaitTxReady:
 	IN	00H		; Check transmit ready (port 0 status)
+D0385	EQU	WaitTxReady+1	; Port number operand (patched by Init)
 	ANI	0C8H		; Mask ready bit
+D0387	EQU	WaitTxReady+3	; Mask operand (patched by Init)
 	JNZ	WaitTxReady	; Wait until ready
 	POP	PSW		; Restore character
 	OUT	01H		; Send character (port 1 data)
+D038D	EQU	WaitTxReady+9	; Port number operand (patched by Init)
 	PUSH	PSW		; Save again
+D038F	EQU	WaitTxReady+11	; IN opcode location (patched by Init)
 	IN	13H		; Check for paper tape mode
 	POP	PSW
 	RET
@@ -778,6 +766,7 @@ WaitTxReady:
 ; GetChar - Get Character from Terminal
 ;-----------------------------------------------------------------------------
 GetChar:
+GetChar_tail:                   ; Alias for code that calls GetChar_tail
 	IN	00H		; Check receive ready (port 0 status)
 	ANI	01H		; Mask ready bit
 	JNZ	GetChar		; Wait until ready
@@ -815,42 +804,44 @@ ListNextLine:
 	POP	HL		; HL = program line content pointer
 ;-----------------------------------------------------------------------------
 ; ListChar - Print characters, expanding tokens to keywords
+; This code uses overlapping instructions and must be exact bytes.
+; The keyword expansion loop uses DE throughout (no PUSH/POP).
 ;-----------------------------------------------------------------------------
 ListChar:
-	RST	3		; Print character in A
-	MOV	A,M		; Get next character
-	ORA	A		; Test for null (end of line)
-	INX	HL		; Advance pointer
-	JZ	ListNextLine	; If null, go to next line
-	JP	ListChar	; If bit 7 clear, print and continue
-	; Bit 7 set - this is a keyword token, need to expand it
-	SUI	7FH		; Convert token to keyword index+1
-	MOV	C,A		; C = keyword counter
-	PUSH	HL		; Save program pointer
-	LXI	DE,KEYWORDS	; DE = start of keyword table
-	PUSH	DE
-;-----------------------------------------------------------------------------
-; ToNextKeyword - Scan through keyword table to find the right one
-;-----------------------------------------------------------------------------
+	RST	3		; DF - Print character in A
+	MOV	A,M		; 7E - Get next character
+	ORA	A		; B7 - Test for null (end of line)
+	INX	HL		; 23 - Advance pointer
+	JZ	ListNextLine	; CA xx xx - If null, go to next line
+	JP	ListChar	; F2 xx xx - If bit 7 clear, continue
+	; Bit 7 set - keyword token handler (overlapping instruction trick)
+	DB	0D6H, 07FH	; SUI 7FH - Convert token to index
+	DB	04FH		; MOV C,A - Save count in C
+	DB	011H		; LXI DE,KEYWORDS
+	DB	LOW KEYWORDS
+	DB	HIGH KEYWORDS
 ToNextKeyword:
-	LDAX	DE		; Get keyword character
-	INX	DE		; Advance pointer
-	ORA	A		; Test bit 7 (last char of keyword)
-	JP	ToNextKeyword	; If not last char, keep scanning
-	; Found end of a keyword
-	DCR	C		; Decrement keyword counter
-	POP	HL		; HL = start of this keyword
-	JNZ	ToNextKeyword-1	; If not the one we want, keep going
-;-----------------------------------------------------------------------------
-; PrintKeyword - Print the keyword characters
-;-----------------------------------------------------------------------------
+	DB	01AH		; LDAX DE - Get keyword char
+	DB	013H		; INX DE - Advance
+	DB	0B7H		; ORA A - Test bit 7
+	DB	0F2H		; JP ToNextKeyword (self-ref)
+	DB	LOW ToNextKeyword
+	DB	HIGH ToNextKeyword
+	DB	00DH		; DCR C - Decrement counter
+	DB	0C2H		; JNZ ToNextKeyword (if not found)
+	DB	LOW ToNextKeyword
+	DB	HIGH ToNextKeyword
 PrintKeyword:
-	MOV	A,M		; Get keyword character
-	ORA	A		; Test bit 7
-	JM	ListChar-1	; If last char, go back (POP HL first)
-	RST	3		; Print character
-	INX	HL		; Advance to next character
-	JMP	PrintKeyword	; Continue printing keyword
+	DB	0DFH		; RST 3 - Print char
+	DB	01AH		; LDAX DE - Get next keyword char
+	DB	013H		; INX DE - Advance
+	DB	0B7H		; ORA A - Test bit 7
+	DB	0F2H		; JP PrintKeyword (loop)
+	DB	LOW PrintKeyword
+	DB	HIGH PrintKeyword
+	DB	0C3H		; JMP ListChar+1 (back to main loop, skip RST 3)
+	DB	LOW (ListChar+1)
+	DB	HIGH (ListChar+1)
 ;=============================================================================
 ; FOR Handler
 ; Although FOR indicates the beginning of a loop, the handler only gets called
@@ -918,7 +909,12 @@ PushStepValue:
 	XTHL			; Swap: (SP)=var addr, HL=prog ptr
 ;-----------------------------------------------------------------------------
 ; EndOfForHandler - Push FOR token and fall into ExecNext
+; This is the entry point for NEXT to re-enter a FOR loop
 ;-----------------------------------------------------------------------------
+EndOfForHandler:
+	MVI	B,81H		; FOR token ID
+	PUSH	BC		; Push token byte
+	INX	SP		; Adjust SP (only push 1 byte)
 ;=============================================================================
 ; ExecNext - Execute next statement
 ; Having executed one statement, moves to the next statement on the line
@@ -992,6 +988,7 @@ Restore:
 	XCHG			; Save HL in DE
 	LHLD	PROGRAM_BASE	; Get start of program
 	DCX	HL		; Point to byte before program
+SaveDataPtr:
 	SHLD	DATA_PROG_PTR	; Store as DATA pointer
 	XCHG			; Restore HL
 	RET
@@ -1006,7 +1003,7 @@ TestBreakKey:
 	CALL	GetChar_tail	; Get the character
 	CPI	03H		; Is it Ctrl-C (break)?
 	JZ	Stop		; If so, stop program
-	RET			; Otherwise return (key ignored)
+	; Fall through to CharIsAlpha (which returns to caller)
 ;-----------------------------------------------------------------------------
 ; CharIsAlpha - Check if character at (HL) is alphabetic
 ; Returns: Carry clear if A-Z, Carry set otherwise
@@ -1029,7 +1026,7 @@ GetSubscript:
 	JM	FunctionCallError	; Error if negative
 	LDA	FACCUM+3	; Get exponent
 	CPI	90H		; Check if > 32767
-	JC	FAsInteger	; Convert to integer if valid
+	JC	FCompare	; Convert to integer if valid
 FunctionCallError:
 	MVI	E,08H		; FC - Function Call error
 	JMP	Error
@@ -1199,7 +1196,7 @@ GotCompareOp:
 	POP	DE		; Pop LHS low word
 	PUSH	HL		; Save program pointer
 	PUSH	PSW		; Save comparison bitmask
-	CALL	FCompare	; Compare LHS to RHS (result in A)
+	CALL	FCompareWithBCDE ; Compare LHS to RHS (result in A)
 	; Convert FCompare result (-1,0,1) to bit pattern and test
 	INR	A		; -1->0, 0->1, 1->2
 	RAL			; 0->0, 1->2, 2->4 (bits 0,1,2)
@@ -1250,7 +1247,7 @@ PrintLoop:
 ;-----------------------------------------------------------------------------
 TerminateInput:
 	MVI	M,00H		; Write null terminator
-	LXI	HL,LINE_BUFFER	; Point to start of input buffer
+	LXI	HL,COMMA_PREFIX	; Point to comma before LINE_BUFFER
 ;-----------------------------------------------------------------------------
 ; NewLine - Print CR/LF plus trailing nulls for teletype timing
 ;-----------------------------------------------------------------------------
@@ -1298,7 +1295,7 @@ CalcSpaceCount:
 	SUI	14		; Subtract zone width
 	JNC	CalcSpaceCount	; Loop until negative
 	CMA			; A = spaces to next zone - 1
-	JMP	PrintSpaces	; Print the spaces
+	JMP	PrintSpaceLoop	; Print the spaces
 ;-----------------------------------------------------------------------------
 ; TAB Handler - Tab to absolute column position
 ; TAB(n) moves to column n
@@ -1347,12 +1344,12 @@ Input:
 Read:
 	PUSH	HL		; Save program pointer
 	LHLD	DATA_PROG_PTR	; Get current DATA pointer
+InputReadCommon	EQU	$+1	; Entry at AF byte = XRA A (clears A for INPUT)
 	ORI	0AFH		; Set A to non-zero (marks as READ)
 ;-----------------------------------------------------------------------------
 ; Common code for INPUT and READ
 ; A=0 for INPUT, A<>0 for READ
 ;-----------------------------------------------------------------------------
-InputReadCommon:
 	STA	INPUT_OR_READ	; Store INPUT/READ flag
 	XTHL			; HL=prog ptr, (SP)=data ptr
 	DB	01H		; LXI B - skip next 2 bytes
@@ -1372,7 +1369,7 @@ ReadNext:
 	LDA	INPUT_OR_READ	; Check if INPUT or READ
 	ORA	A
 	INX	HL		; Advance past null
-	JNZ	NextDataLine	; If READ, find next DATA line
+	JNZ	ScanForData	; If READ, find next DATA line (skip POP HL)
 	; INPUT needs another '?' prompt
 	MVI	A,'?'		; Print question mark
 	RST	3
@@ -1432,20 +1429,20 @@ Next:
 	XTHL			; HL = var addr, (SP) = struct ptr
 	; Add STEP to loop variable
 	PUSH	HL		; Save var address
-	CALL	FAddMem		; FACCUM = var + STEP
+	CALL	FAddMem_load	; FACCUM = var + STEP
 	POP	HL		; HL = var address
 	CALL	FCopyToMem	; Store updated var value
 	; Load TO limit value
 	POP	HL		; HL = struct ptr (now at TO value)
-	CALL	FLoadBCDEFromMem	; BCDE = TO limit
+	CALL	FLoadBCDEfromMem	; BCDE = TO limit
 	; Compare var to limit
 	PUSH	HL		; Save struct ptr
-	CALL	FCompare	; Compare var to limit (-1,0,1)
+	CALL	FCompareWithBCDE ; Compare var to limit (-1,0,1)
 	POP	HL		; Restore struct ptr
 	POP	BC		; B = direction byte (1=up, -1=down)
 	; Check if loop complete: compare result - direction = 0 means done
 	SUB	B		; If result=direction, loop done
-	CALL	FLoadBCDEFromMem	; BC=FOR stmt ptr, DE=line number
+	CALL	FLoadBCDEfromMem	; BC=FOR stmt ptr, DE=line number
 	JZ	ForLoopDone	; Jump if loop complete
 	; Loop not done - go back to FOR statement
 	XCHG			; HL = line number
@@ -1587,8 +1584,10 @@ DimContd:
 	DB	','
 Dim:	LXI	BC,DimContd	; Set return address for next DIM item
 	PUSH	BC
-	ORI	0AFH		; Set A non-zero (fall into GetVar+1)
-				; This flags we're declaring, not accessing
+	DB	0F6H		; ORI 0AFH - Set A non-zero for DIM
+				; Fall through to GetVar which starts with AF (XRA A)
+				; When entered at Dim+5, executes ORI 0AFH, A=non-zero
+				; When entered at GetVar, executes XRA A, A=0
 ;=============================================================================
 ; GetVar - Variable Lookup/Creation
 ; Given variable name at HL, returns pointer to variable value in DE.
@@ -1598,6 +1597,7 @@ Dim:	LXI	BC,DimContd	; Set return address for next DIM item
 ; Exit:  DE=pointer to variable value (4 bytes)
 ;        HL=updated program pointer
 ;=============================================================================
+GetVar:	XRA	A		; Clear A (also serves as operand for ORI above)
 	STA	DIM_OR_EVAL	; Store DIM/EVAL flag
 	MOV	B,M		; B = first char of variable name
 	CALL	CharIsAlpha	; Check if alphabetic
@@ -1605,11 +1605,12 @@ Dim:	LXI	BC,DimContd	; Set return address for next DIM item
 	XRA	A		; Clear A
 	MOV	C,A		; C = 0 (default second char)
 	RST	2		; NextChar
-	JNC	GetVar		; If not alphanumeric, jump to GetVar
+	JNC	GetVarCheckArray ; If not alphanumeric, skip to array check
 	MOV	C,A		; C = second char of variable name
 	RST	2		; NextChar
 ; Check if next char is '(' - if so, it's an array access
-GetVar:	SUI	'('		; Subtract '(' (28H)
+GetVarCheckArray:
+	SUI	'('		; Subtract '(' (28H)
 	JZ	GetArrayVar	; Jump if array variable
 	; Simple variable lookup - search VAR_BASE to VAR_ARRAY_BASE
 	PUSH	HL		; Save program pointer
@@ -1679,7 +1680,7 @@ VarFound:
 	RET
 ; Called from expression evaluator - return with FACCUM = 0
 CalledFromEval:
-	STA	FACCUM		; A=0 from compare, set FACCUM to 0
+	STA	FACCUM_EXP	; A=0 from compare, zero the exponent
 	POP	HL		; Restore program pointer
 	RET
 ;=============================================================================
@@ -1773,7 +1774,7 @@ StoreArraySize:
 	; Check memory and update VAR_TOP
 	PUSH	HL		; Save ptr to array data area
 	DAD	DE		; HL = new VAR_TOP
-	CALL	CheckEnoughMem	; Make sure it fits
+	CALL	CheckEnoughMem+1 ; Make sure it fits (enter at PUSH HL)
 	SHLD	VAR_TOP		; Update VAR_TOP
 	POP	DE		; DE = array data start
 ; Initialize all array elements to zero
@@ -1803,22 +1804,25 @@ FWordToFloat:
 	JMP	FCharToFloat+5	; Continue in conversion routine
 
 ;-----------------------------------------------------------------------------
-; FAddOneHalf - Add 0.5 to FACCUM (for rounding)
+; FAddMem - Add 0.5 to FACCUM (for rounding)
 ;-----------------------------------------------------------------------------
-FAddOneHalf:
-	LXI	HL,ONE_HALF	; Point to 0.5 constant
 FAddMem:
+	LXI	HL,ONE_HALF	; Point to 0.5 constant
+FAddMem_load:
 	CALL	FLoadBCDEfromMem ; Load BCDE from memory
-	JMP	FAdd+2		; Add to FACCUM
+	JMP	FAdd		; Add to FACCUM
 
 ;-----------------------------------------------------------------------------
 ; FSub - Floating point subtraction: FACCUM = stack - FACCUM
 ; Entry: LHS on stack, RHS in FACCUM
+; Overlapping instruction trick: Entry at FSub-2 pops BC/DE from stack
 ;-----------------------------------------------------------------------------
-	POP	BC		; Get LHS exponent/high mantissa
-	POP	DE		; Get LHS low mantissa
+FSubEntry:
+	DB	0C1H		; POP BC (or part of LXI operand when skipped)
+	DB	0D1H		; POP DE (or part of LXI operand when skipped)
 FSub:	CALL	FNegate		; Negate RHS
-	DB	21H		; LXI H,... to skip into FAdd
+FAddEntry	EQU	$+1	; Entry point at C1 D1 (POP BC; POP DE when jumped to)
+	LXI	HL,0D1C1H	; Skip to FAdd (C1 D1 operand = POP BC; POP DE trick)
 ;-----------------------------------------------------------------------------
 ; FAdd - Floating point addition: FACCUM = BCDE + FACCUM
 ; Entry: LHS in BCDE, RHS in FACCUM
@@ -1827,7 +1831,7 @@ FSub:	CALL	FNegate		; Negate RHS
 FAdd:	MOV	A,B		; Check LHS exponent
 	ORA	A		; If LHS is zero
 	RZ			; Just return (FACCUM unchanged)
-	LDA	FACCUM		; Check RHS exponent
+	LDA	FACCUM_EXP	; Check RHS exponent
 	ORA	A
 	JZ	FLoadFromBCDE	; If RHS=0, result is LHS
 	; Compare exponents to align mantissas
@@ -1905,7 +1909,7 @@ FNormaliseLoop:
 	MOV	A,H
 	JP	FNormaliseLoop	; Loop if not done
 	; Adjust exponent by shift count (H is negative)
-	LXI	HL,FACCUM	; Point to exponent
+	LXI	HL,FACCUM_EXP	; Point to exponent
 	ADD	M		; Add (negative) shift count
 	MOV	M,A
 	JNC	FZero		; Underflow = zero
@@ -1917,7 +1921,7 @@ FNormaliseLoop:
 ;-----------------------------------------------------------------------------
 FRoundUp:
 	MOV	A,B		; A = extra mantissa byte
-	LXI	HL,FACCUM	; Point to FACCUM
+	LXI	HL,FACCUM_EXP	; Point to exponent
 	ORA	A		; If bit 7 of extra byte set
 	CM	FMantissaInc	; Round up the mantissa
 	; Set sign and store result
@@ -2044,6 +2048,7 @@ FMantissaRtOnce:
 ; FMul - Floating point multiplication: FACCUM = stack * FACCUM
 ; Uses shift-and-add algorithm for mantissa multiplication
 ;-----------------------------------------------------------------------------
+FMulEntry:
 	POP	BC		; Get LHS from stack
 	POP	DE
 FMul:	RST	5		; FTestSign - check if RHS is zero
@@ -2067,7 +2072,7 @@ FMul:	RST	5		; FTestSign - check if RHS is zero
 	LXI	HL,FMulOuterLoop
 	PUSH	HL
 	PUSH	HL
-	LXI	HL,FACCUM+1	; Point to RHS mantissa
+	LXI	HL,FACCUM	; Point to RHS mantissa
 ; Outer loop: process one byte of RHS mantissa at a time
 FMulOuterLoop:
 	MOV	A,M		; Get RHS mantissa byte
@@ -2092,7 +2097,7 @@ FMulNoAdd:
 	DCR	L		; Count bits
 	MOV	A,H		; Restore RHS byte
 	JNZ	FMulInnerLoop
-PopHLRet:
+FMulReturn:
 	POP	HL		; Restore FACCUM pointer
 	RET			; Return (to outer loop or FNormalise)
 ;-----------------------------------------------------------------------------
@@ -2110,10 +2115,11 @@ FDivByTen:
 ; FDiv - Floating point division: FACCUM = stack / FACCUM
 ; Uses repeated subtraction (long division) algorithm
 ;-----------------------------------------------------------------------------
+FDivEntry:
 	POP	BC		; Get LHS (dividend) from stack
 	POP	DE
 FDiv:	RST	5		; FTestSign - check if RHS (divisor) is zero
-	JZ	DivideByZero	; Error if divide by zero
+	JZ	DivByZero	; Error if divide by zero
 	; Subtract exponents (L=FF means subtract)
 	MVI	L,0FFH
 	CALL	FExponentAdd
@@ -2123,13 +2129,13 @@ FDiv:	RST	5		; FTestSign - check if RHS (divisor) is zero
 	; Store RHS mantissa in self-modifying code locations
 	DCX	HL
 	MOV	A,M
-	STA	FDivLoop+11	; High byte
+	STA	FDivLoop+12	; High byte
 	DCX	HL
 	MOV	A,M
-	STA	FDivLoop+7	; Middle byte
+	STA	FDivLoop+8	; Middle byte
 	DCX	HL
 	MOV	A,M
-	STA	FDivLoop+3	; Low byte
+	STA	FDivLoop+4	; Low byte
 	; Initialize for long division
 	MOV	B,C		; B = LHS high mantissa byte
 	XCHG			; HL = LHS low mantissa
@@ -2137,7 +2143,7 @@ FDiv:	RST	5		; FTestSign - check if RHS (divisor) is zero
 	MOV	C,A		; Initialize result mantissa to 0
 	MOV	D,A
 	MOV	E,A
-	STA	FDivLoop+18	; Initialize carry byte
+	STA	FDivLoop+15	; Initialize carry byte
 ; Long division loop
 FDivLoop:
 	PUSH	HL		; Save dividend
@@ -2157,7 +2163,7 @@ FDivLoop:
 	CMC			; Complement carry for comparison
 	JNC	FDivNoSubtract
 	; Subtraction succeeded - keep result
-	STA	FDivLoop+18	; Update carry
+	STA	FDivLoop+15	; Update carry
 	POP	PSW		; Discard old values
 	POP	PSW
 	STC			; Set carry for quotient bit
@@ -2170,7 +2176,7 @@ FDivNoSubtract:
 	INR	A		; Test if normalized
 	DCR	A
 	RAR			; Shift carry into result
-	JM	FRoundUp	; Done if normalized
+	JM	FRoundUp+1	; Done if normalized (skip MOV A,B)
 	RAL			; Undo the shift
 	CALL	FMantissaLeft	; Shift result left
 	; Shift dividend left (multiply by 2)
@@ -2178,9 +2184,9 @@ FDivNoSubtract:
 	MOV	A,B
 	RAL
 	MOV	B,A
-	LDA	FDivLoop+18	; Shift carry byte
+	LDA	FDivLoop+15	; Shift carry byte
 	RAL
-	STA	FDivLoop+18
+	STA	FDivLoop+15
 	; Check if dividend is zero
 	MOV	A,C
 	ORA	D
@@ -2188,7 +2194,7 @@ FDivNoSubtract:
 	JNZ	FDivLoop
 	; Decrement exponent and continue
 	PUSH	HL
-	LXI	HL,FACCUM
+	LXI	HL,FACCUM_EXP
 	DCR	M
 	POP	HL
 	JNZ	FDivLoop
@@ -2204,7 +2210,7 @@ FExponentAdd:
 	ORA	A
 	JZ	FExpAddZero	; Exit early if LHS is zero
 	MOV	A,L		; Get add/subtract flag
-	LXI	HL,FACCUM	; Point to RHS exponent
+	LXI	HL,FACCUM_EXP	; Point to RHS exponent
 	XRA	M		; XOR with RHS exponent (complement for subtract)
 	ADD	B		; Add LHS exponent
 	MOV	B,A
@@ -2215,7 +2221,7 @@ FExponentAdd:
 	; Add bias and store exponent
 	ADI	80H		; Add bias
 	MOV	M,A		; Store in FACCUM
-	JZ	PopHLRet	; Zero = underflow, exit via PopHLRet
+	JZ	FMulReturn	; Zero = underflow, exit via POP HL; RET
 	; Unpack mantissas and store sign
 	CALL	FUnpackMantissas
 	MOV	M,A		; Store sign relationship
@@ -2232,7 +2238,7 @@ FExpAddZero:
 ; FZero - Set FACCUM to zero
 ;-----------------------------------------------------------------------------
 FZero:	XRA	A
-	STA	FACCUM		; Zero exponent = zero value
+	STA	FACCUM_EXP	; Zero exponent = zero value
 	RET
 ;-----------------------------------------------------------------------------
 ; FMulByTen - Multiply FACCUM by 10.0 (optimized)
@@ -2247,7 +2253,7 @@ FMulByTen:
 	JC	Overflow	; Check overflow
 	MOV	B,A
 	CALL	FAdd		; Add to FACCUM (now FACCUM*5)
-	LXI	HL,FACCUM	; Multiply by 2 (add 1 to exponent)
+	LXI	HL,FACCUM_EXP	; Multiply by 2 (add 1 to exponent)
 	INR	M
 	RNZ
 	JMP	Overflow
@@ -2280,7 +2286,7 @@ FCharToFloat:
 	MVI	B,88H		; Exponent for 8-bit integer
 	LXI	DE,0		; Low mantissa bytes = 0
 FCharToFloat2:
-	LXI	HL,FACCUM	; Point to FACCUM
+	LXI	HL,FACCUM_EXP	; Point to exponent
 	MOV	C,A		; C = mantissa high byte
 	MOV	M,B		; Store exponent
 	MVI	B,0		; B = 0 (extra precision)
@@ -2311,7 +2317,7 @@ FNegate:
 ; Preserves return address, pushes FACCUM as 2 words (BCDE format)
 ;-----------------------------------------------------------------------------
 FPush:	XCHG			; Save DE
-	LHLD	FACCUM+1	; Get low 2 bytes
+	LHLD	FACCUM		; Get low 2 bytes
 	XTHL			; Swap with return address
 	PUSH	HL		; Push return address
 	LHLD	FACCUM+2	; Get high 2 bytes (mantissa high + exponent)
@@ -2333,7 +2339,7 @@ FLoadFromMem:
 ;-----------------------------------------------------------------------------
 FLoadFromBCDE:
 	XCHG			; HL = low mantissa
-	SHLD	FACCUM+1	; Store low mantissa
+	SHLD	FACCUM		; Store low mantissa
 	MOV	H,B		; HL = exponent/high mantissa
 	MOV	L,C
 	SHLD	FACCUM+2	; Store high mantissa and exponent
@@ -2344,7 +2350,7 @@ FLoadFromBCDE:
 ; FCopyToBCDE - Copy FACCUM to BCDE registers
 ;-----------------------------------------------------------------------------
 FCopyToBCDE:
-	LXI	HL,FACCUM+1	; Point to mantissa
+	LXI	HL,FACCUM	; Point to mantissa
 FLoadBCDEfromMem:
 	MOV	E,M		; E = low mantissa byte
 	INX	HL
@@ -2353,6 +2359,7 @@ FLoadBCDEfromMem:
 	MOV	C,M		; C = high mantissa byte (with sign)
 	INX	HL
 	MOV	B,M		; B = exponent
+IncHL:
 	INX	HL
 	RET
 ;-----------------------------------------------------------------------------
@@ -2360,7 +2367,7 @@ FLoadBCDEfromMem:
 ; Entry: HL = destination pointer
 ;-----------------------------------------------------------------------------
 FCopyToMem:
-	LXI	DE,FACCUM+1	; Source = FACCUM mantissa
+	LXI	DE,FACCUM	; Source = FACCUM mantissa
 	MVI	B,4		; 4 bytes to copy
 FCopyLoop:
 	LDAX	DE
@@ -2409,7 +2416,7 @@ FCompareWithBCDE:
 	MOV	A,B		; Check if BCDE is zero
 	ORA	A
 	JZ	FTestSign	; If zero, result depends on FACCUM sign
-	LXI	HL,FTestSign_tail-1 ; Return address for sign check
+	LXI	HL,FTestSign_tail+4 ; Return address for sign check (into CPI's operand)
 	PUSH	HL
 	RST	5		; FTestSign - check FACCUM
 	MOV	A,C		; Get BCDE sign
@@ -2485,7 +2492,7 @@ FCompareNeg:
 ;-----------------------------------------------------------------------------
 ; Int - INT function: truncate to integer
 ;-----------------------------------------------------------------------------
-Int:	LXI	HL,FACCUM	; Point to exponent
+Int:	LXI	HL,FACCUM_EXP	; Point to exponent
 	MOV	A,M
 	CPI	98H		; Check if already integer
 	RNC			; Return if exponent >= 24 bits
@@ -2503,6 +2510,7 @@ Int:	LXI	HL,FACCUM	; Point to exponent
 ;   D = exponent sign (0xFF = negative, 0x01 = positive)
 ;   E = exponent value
 ;-----------------------------------------------------------------------------
+FIn:
 FInInit:
 	DCX	HL		; Point to just before number
 	CALL	FZero		; Clear FACCUM
@@ -2605,7 +2613,7 @@ FInExpAccum:
 PrintIN:
 	PUSH	HL
 	LXI	HL,szIn		; " IN " string
-	CALL	PrintString
+	CALL	PrintString+1	; Skip INX HL
 	POP	HL
 ;-----------------------------------------------------------------------------
 ; PrintInt - Print integer in HL (converts to float and prints)
@@ -2622,6 +2630,7 @@ PrintInt:
 ; FOut - Float Output: Convert FACCUM to ASCII string in FBUFFER
 ; Output string is then printed by returning to PrintString
 ;-----------------------------------------------------------------------------
+FOut:
 FOutStart:
 	LXI	HL,FBUFFER	; Output buffer
 	PUSH	HL
@@ -2646,7 +2655,7 @@ FOutOver100K:
 	CALL	FCompareWithBCDE
 	JPO	FOutPrepare	; If FACCUM >= 100000, continue
 	POP	PSW		; Get decimal exponent adjustment
-	CALL	FInMulTen	; Multiply by 10, decrement adjustment
+	CALL	FInMulTen+1	; Multiply by 10, decrement adjustment (skip RZ)
 	PUSH	PSW
 	JMP	FOutOver100K
 ; Divide by 10 and increment exponent adjustment
@@ -2706,7 +2715,7 @@ FOutSubLoop:
 	DCX	HL
 	DCX	HL
 	JNC	FOutSubLoop	; Continue until underflow
-	CALL	FNormalise	; Add back (undo last subtraction)
+	CALL	FAddMantissas	; Add back (undo last subtraction)
 	INX	HL		; Move to next power
 	CALL	FLoadFromBCDE	; Store result back
 	XCHG			; DE = power table ptr
@@ -2805,7 +2814,7 @@ SqrLoop:
 	CALL	FPush		; Push current estimate
 	LXI	HL,FBUFFER	; Original value
 	CALL	FLoadBCDEfromMem
-	CALL	FMul		; FACCUM = estimate * original
+	CALL	FDiv		; FACCUM = original / estimate
 	POP	BC		; Get pushed estimate
 	POP	DE
 	CALL	FAdd		; FACCUM = estimate + original/estimate
@@ -2813,7 +2822,7 @@ SqrLoop:
 	LXI	BC,8000H	; BCDE = 0.5
 	MOV	D,C
 	MOV	E,C
-	CALL	FMul+2		; FACCUM = (estimate + N/estimate) / 2
+	CALL	FMul		; FACCUM = (estimate + N/estimate) / 2
 	POP	PSW		; Get iteration count
 	DCR	A
 	JNZ	SqrLoop		; Continue if not done
@@ -2837,7 +2846,7 @@ Rnd:	RST	5		; FTestSign - check argument
 	; Linear congruential: seed * 11879546
 	LXI	BC,9835H	; Multiplier constant
 	LXI	DE,447AH
-	CALL	FMul+2
+	CALL	FMul
 	; Add small constant
 	LXI	BC,6828H	; Addend constant
 	LXI	DE,0B146H
@@ -2869,7 +2878,7 @@ Sin:	CALL	FPush		; Push x (radians)
 	CALL	FLoadFromBCDE	; Load 2*pi
 	POP	BC		; Get x
 	POP	DE
-	CALL	FMul		; u = x / 2pi (actually wrong - should be FDiv)
+	CALL	FDiv		; u = x / 2pi
 	; Get fractional part: u = u - INT(u)
 	CALL	FPush		; Push u
 	CALL	Int		; INT(u)
@@ -2903,7 +2912,7 @@ SinQuadrant:
 	; sin(q) ≈ q * (c0 + q² * (c1 + q² * (c2 + q² * (c3 + q² * c4))))
 	CALL	FPush		; Push q
 	CALL	FCopyToBCDE	; Get q to BCDE
-	CALL	FMul+2		; q² = q * q
+	CALL	FMul		; q² = q * q
 	CALL	FPush		; Push q²
 	LXI	HL,SIN_COEFFS	; Taylor coefficients table
 	CALL	FLoadFromMem	; Load first coefficient
@@ -2915,7 +2924,7 @@ SinTaylorLoop:
 	PUSH	DE		; Push q²
 	PUSH	BC
 	PUSH	HL		; Save coefficient pointer
-	CALL	FMul+2		; acc = acc * q²
+	CALL	FMul		; acc = acc * q²
 	POP	HL		; Get coefficient pointer
 	CALL	FLoadBCDEfromMem ; Load next coefficient
 	PUSH	HL		; Save updated pointer
@@ -2926,7 +2935,7 @@ SinTaylorLoop:
 	POP	PSW		; Get count
 	DCR	A
 	JNZ	SinTaylorLoop	; Continue if not done
-	JMP	FMul		; Final multiply by q and return
+	JMP	FMulEntry	; Final multiply by q and return (pops BC/DE from stack)
 ;-----------------------------------------------------------------------------
 ; Taylor series coefficients for sine
 ; These approximate: sin(pi*x) / (pi*x) for small x
@@ -3040,6 +3049,7 @@ IO_CONFIG_TABLE:
 ; ConfigIO - Configure I/O code with detected hardware settings
 ; Called after DetectIO to set up I/O port addresses in the code
 ;-----------------------------------------------------------------------------
+DoOptionalFns:
 ConfigIO:
 	MOV	H,D		; Get detected I/O parameters
 	MOV	L,B
@@ -3075,12 +3085,12 @@ Init:	LXI	HL,0F40H	; Default top of memory (3904 bytes)
 	CALL	DetectIO	; Detect and configure I/O hardware
 	LXI	HL,0FFFFH	; Current line = -1 (direct mode)
 	SHLD	CURRENT_LINE
-	CALL	OutputNewline	; Print newline
+	CALL	NewLine		; Print newline
 ; Ask user for memory size
 AskMemorySize:
 	LXI	HL,szMemorySize	; "MEMORY SIZE"
-	CALL	PrintStr
-	CALL	InputLine	; Get user input
+	CALL	PrintString+1	; Skip INX HL
+	CALL	InputLineWithQ	; Get user input with "? " prompt
 	JC	AskMemorySize	; Retry on error
 	RST	2		; NextChar
 	ORA	A		; Empty input?
@@ -3113,7 +3123,7 @@ GotMemoryTop:
 ;-----------------------------------------------------------------------
 AskTerminalWidth:
 	LXI	HL,szTerminalWidth
-	CALL	PrintString
+	CALL	PrintString+1	; Skip INX HL
 	CALL	InputLineWithQ	; Get input with "?" prompt
 	JC	AskTerminalWidth ; On break, ask again
 	RST	2		; NextChar - get first char
@@ -3153,7 +3163,7 @@ OptFnLoop:
 	JZ	OptFnDone	; Yes, done with optional functions
 	RST	6		; PushNextWord - get prompt string address
 	XTHL			; HL = prompt string, stack has descriptor ptr
-	CALL	PrintString	; Print "WANT xxx"
+	CALL	PrintString+1	; Print "WANT xxx" (skip INX HL)
 	CALL	InputLineWithQ	; Get Y/N response
 	RST	2		; NextChar - get first char of response
 	POP	HL		; Restore descriptor pointer
@@ -3188,7 +3198,7 @@ InitComplete:
 	SPHL			; Set stack pointer to memory top
 	SHLD	STACK_TOP	; Save stack top
 	XCHG			; HL = program base, DE = stack top
-	CALL	CheckEnoughMem	; Verify enough space between them
+	CALL	CheckEnoughMem+1 ; Verify enough space (enter at PUSH HL)
 	; Calculate free bytes: (stack_top - program_base) - 16
 	MOV	A,E		; DE still has stack top
 	SUB	L
@@ -3199,11 +3209,11 @@ InitComplete:
 	LXI	BC,0FFF0H	; -16 for overhead
 	DAD	BC		; HL = free bytes
 	CALL	PrintInt	; Print free byte count
-	LXI	HL,szByteFree	; " BYTES FREE" message
-	CALL	PrintString
+	LXI	HL,szBytesFree	; " BYTES FREE" message
+	CALL	PrintString+1	; Skip INX HL (HL already points to first char)
 	; Patch startup code for subsequent runs
-	LXI	HL,PrintString	; After first run, Main should call
-	SHLD	0205H		;   PrintString instead of restart code
+	LXI	HL,PrintString+1 ; After first run, Main should call
+	SHLD	0205H		;   PrintString+1 (skip INX HL)
 	CALL	Run		; Initialize variables (NEW without msg)
 	; Redirect cold start to warm start
 	LXI	HL,Main		; Future starts go to Main
@@ -3239,6 +3249,6 @@ szSQR:	DB	'SQR',0
 szTerminalWidth:
 	DB	'TERMINAL WIDTH',0
 szMemorySize:
-	DB	'MEMORY SIZE',0
+	DB	'MEMORY SIZE'
 
 	END
