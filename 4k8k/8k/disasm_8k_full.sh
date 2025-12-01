@@ -165,6 +165,7 @@ ud80 8kbas.bin --org 0 \
     -e 1A41,scnstr \
     -e 1A5D,FindMemTop \
     -e 1ADD,SetupTrigFns \
-    -o 8kbas_labeled.mac
+    -o 8kbas_raw.mac
 
-echo "Disassembly complete"
+echo "Disassembly complete - output in 8kbas_raw.mac"
+echo "Run processing scripts to generate 8kbas_labeled.mac"
