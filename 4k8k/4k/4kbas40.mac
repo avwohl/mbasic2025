@@ -112,18 +112,14 @@ FTestSign:
 ; Uses self-modifying code for the return jump.
 ; The first 8 bytes (RST 6 slot) set up and jump to continuation.
 ;=============================================================================
-	db	0E3H		; XTHL - get return address into HL
-	db	22H		; SHLD PushRetAddr (store return address)
-	db	low PushRetAddr
-	db	high PushRetAddr
-	db	0E1H		; POP HL - restore original HL
-	db	0C3H		; JMP PushNextWord
-	db	low PushNextWord
-	db	high PushNextWord
+	xthl			; Get return address into HL
+	shld	PushRetAddr	; Store return address for later jump
+	pop	hl		; Restore original HL
+	jmp	PushNextWord	; Continue at main code
 ;-----------------------------------------------------------------------------
 ; RST 7 slot (0x38-0x3A) - Data bytes for I/O patching
 ;-----------------------------------------------------------------------------
-	db	0C9H		; RET opcode byte (used for I/O config)
+	ret			; RET opcode (used for I/O config)
 	dw	0154H		; Additional I/O configuration bytes
 ;-----------------------------------------------------------------------------
 ; PushNextWord continuation (0x003B)
