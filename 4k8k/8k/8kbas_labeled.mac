@@ -118,6 +118,10 @@ szBreak:
 	DB	41H	; 0040
 	DB	4BH	; 0041
 	DB	00H	; 0042
+					;end disk functions
+; spcdsk functions
+; the following tables are the alphabetic dispatch table
+; followed by the reserved word table itself
 STMT_DISPATCH:	DW	StmtEND
 	DW	StmtFOR
 	DW	StmtNEXT
@@ -132,6 +136,10 @@ STMT_DISPATCH:	DW	StmtEND
 D0059:	DW	Sin
 D005B:	DW	L187C
 D005D:	DW	Cos
+					;end disk functions
+; spcdsk functions
+; the following tables are the alphabetic dispatch table
+; followed by the reserved word table itself
 D005F:	DW	StmtLET
 	DW	Right
 	DW	StmtNEW
@@ -494,7 +502,8 @@ L028E:	LXI	BC,L000D
 	DAD	BC
 	JMP	L027A
 CopyMemoryUp:	CALL	02AFH
-bltuc:	PUSH	BC
+					;sure the stack won'T BE OVERRUN
+bltuc:	PUSH	BC				;exchange [b,c] and [h,l]
 	XTHL
 	POP	BC
 L029D:	RST	4
@@ -547,7 +556,7 @@ L02E9:	CALL	finex
 	INR	A
 	CNZ	L15FC
 	MVI	A,0C1H
-Main:	XRA	A
+Main:	XRA	A				;set zero flag in [a]
 	STA	SUPPRESS_OUTPUT
 	CALL	L08E0
 	LXI	HL,szOK
@@ -615,7 +624,7 @@ GetNonBlankLine:	POP	DE
 	MOV	M,D
 	INX	HL
 	LXI	DE,D01D9
-mloopr:	LDAX	DE
+mloopr:	LDAX	DE				;now transfering line
 	MOV	M,A
 	INX	HL
 	INX	DE
@@ -624,7 +633,13 @@ mloopr:	LDAX	DE
 L0375:	CALL	L03BC
 	INX	HL
 	XCHG
-chead:	MOV	H,D
+;
+; chead goes through program storage and fixes
+; up all the links. the end of each
+; line is found by searching for the zero at the end.
+; the double zero link is used to detect the end of the program
+;
+chead:	MOV	H,D				;[h,l]=[d,e]
 	MOV	L,E
 	MOV	A,M
 	INX	HL
@@ -809,7 +824,7 @@ L048C:	STA	D0225
 L048F:	SUI	54H
 	JNZ	L0401
 	MOV	B,A
-sngau1:	MOV	A,M
+sngau1:	MOV	A,M				;see if zero
 	ORA	A
 	JZ	L04A5
 	CMP	B
@@ -889,7 +904,12 @@ L051A:	MOV	A,B
 	INR	B
 L0529:	RST	3
 	JMP	L04DD
-L052D:	LDA	SUPPRESS_OUTPUT
+;
+; here when the data that was typed in or in "DATA" statements
+; is improperly formatted. for "INPUT" we start again.
+; for "READ" we give a syntax error at the data line
+;
+L052D:	LDA	SUPPRESS_OUTPUT		;was it read or input?
 	ORA	A
 	JNZ	L0F14
 	POP	PSW
@@ -1034,7 +1054,7 @@ L05C9:	XCHG
 	CALL	L14AC
 	RST	5
 	POP	HL
-lexist:	PUSH	BC
+lexist:	PUSH	BC				;save the pointer
 	PUSH	DE
 	PUSH	PSW
 	INX	SP
@@ -1098,7 +1118,7 @@ L0653:	CPI	20H
 L065E:	XCHG
 	LHLD	PROGRAM_BASE
 	DCX	HL
-resfin:	SHLD	D0251
+resfin:	SHLD	D0251			;read finishes come to resfin
 	XCHG
 	RET
 L0668:	IN	00H
@@ -1125,7 +1145,7 @@ L0689:	LHLD	CURRENT_LINE
 	SHLD	D0247
 	LHLD	D0243
 	SHLD	D0249
-L069C:	XRA	A
+L069C:	XRA	A				;set zero flag in [a]
 	STA	SUPPRESS_OUTPUT
 	CALL	L08E0
 	POP	PSW
@@ -1209,7 +1229,7 @@ L0713:	RST	4
 	MOV	M,A
 	INX	HL
 	JMP	L0713
-pophsr:	POP	PSW
+pophsr:	POP	PSW				;get off terminating digit
 	POP	HL
 	RET
 L0728:	MOV	A,M
@@ -1350,10 +1370,10 @@ L07F4:	LXI	HL,L060C
 Restore:	LXI	BC,L0E3A
 	NOP
 	MVI	B,00H
-exchqt:	MOV	A,C
+exchqt:	MOV	A,C				;when a quote is seen the second
 	MOV	C,B
 	MOV	B,A
-str1:	MOV	A,M
+str1:	MOV	A,M				;get a char
 	ORA	A
 	RZ
 	CMP	B
@@ -1402,7 +1422,7 @@ L0853:	CALL	fretms
 	CALL	L14BB
 	POP	HL
 	RET
-edent:	PUSH	HL
+edent:	PUSH	HL				;save line #
 	CALL	L14B8
 	POP	DE
 	POP	HL
@@ -1526,7 +1546,7 @@ D08CE:	DB	48H	; 08CE
 	DB	0C3H	; 08DD
 	DB	99H	; 08DE
 	DB	08H	; 08DF
-L08E0:	LDA	TERMINAL_X
+L08E0:	LDA	TERMINAL_X			;do line pointers exist in pgm?
 	ORA	A
 	RZ
 	JMP	L08ED
@@ -1620,7 +1640,12 @@ D093A:	DB	3FH	; 093A
 	DB	0DH	; 094A
 	DB	0AH	; 094B
 	DB	00H	; 094C
-trmnok:	LDA	D0242
+;
+; here when the data that was typed in or in "DATA" statements
+; is improperly formatted. for "INPUT" we start again.
+; for "READ" we give a syntax error at the data line
+;
+trmnok:	LDA	D0242			;was it read or input?
 	ORA	A
 	JNZ	L02C0
 	POP	BC
@@ -1849,7 +1874,7 @@ L0AB0:	SUI	0ABH
 	SHLD	D023C
 	RST	2
 	JMP	L0AB0
-kloop:	MOV	A,D
+kloop:	MOV	A,D				;get character from buf
 	ORA	A
 	JNZ	L0BC3
 	MOV	A,M
@@ -1925,7 +1950,8 @@ L0B51:	CALL	L0A86
 	POP	HL
 	RET
 L0B56:	CALL	0C44H
-retvar:	PUSH	HL
+					;variable in [d,e]
+retvar:	PUSH	HL				;save the text pointer
 	XCHG
 	SHLD	D0253
 	LDA	D0224
@@ -2116,7 +2142,7 @@ Sqr:	LXI	BC,D0C3A
 	ORI	0AFH
 	STA	D0223
 	MOV	B,M
-ptrgt2:	CALL	L0728
+ptrgt2:	CALL	L0728			;check for letter
 	JC	SyntaxError
 	XRA	A
 	MOV	C,A
@@ -2169,7 +2195,7 @@ L0C9E:	INX	HL
 	INX	HL
 	INX	HL
 	JMP	L0C92
-smkvar:	POP	HL
+smkvar:	POP	HL				;[h,l]= text pointer
 	XTHL
 	PUSH	DE
 	LXI	DE,retvar
@@ -2200,7 +2226,7 @@ L0CCD:	DCX	HL
 	INX	HL
 	MOV	M,D
 	INX	HL
-mulret:	XCHG
+mulret:	XCHG				;return the result in [d,e]
 	POP	HL
 	RET
 L0CDC:	STA	D0256
@@ -2246,7 +2272,12 @@ L0CDC:	STA	D0256
 	DB	00H	; 0D0A
 	DB	0D5H	; 0D0B
 	DB	11H	; 0D0C
-cat:	PUSH	HL
+;
+; the following routine concatenates two strings
+; the faclo contains the first one at this point,
+; [h,l] points beyond the + sign after it
+;
+cat:	PUSH	HL				;put old precedence back on
 	PUSH	PSW
 	LHLD	D024D
 	MVI	A,19H
@@ -2421,7 +2452,7 @@ L0DF9:	CALL	L0E60
 	DB	0C3H	; 0E13
 	DB	4CH	; 0E14
 	DB	0EH	; 0E15
-poke:	CALL	L0E60
+poke:	CALL	L0E60				;evaluate address, get integer in [d,e]
 	PUSH	DE
 	CALL	L0B3F
 	CALL	L0A86
@@ -2486,13 +2517,13 @@ L0E60:	RST	1
 	MOV	B,A
 	CALL	ptrgt2
 	JMP	L0A86
-StmtLIST:	CALL	L0A86
+StmtLIST:	CALL	L0A86			;force the fac to be sng or dbl
 	CALL	L160F
 	CALL	L0EA3
 	CALL	L1016
 	LXI	BC,L106D
 	PUSH	BC
-frcinc:	MOV	A,M
+frcinc:	MOV	A,M				;get low byte of constant
 	INX	HL
 	INX	HL
 	PUSH	HL
@@ -2512,7 +2543,7 @@ L0E97:	LXI	HL,D0236
 	PUSH	HL
 	MOV	M,A
 	INX	HL
-putdei:	INX	HL
+putdei:	INX	HL				;store [d,e]=pointer to free space
 	MOV	M,E
 	INX	HL
 	MOV	M,D
@@ -2553,11 +2584,12 @@ L0EC5:	LXI	DE,D0236
 	MVI	E,1EH
 	JMP	Error
 D0EE2:	DB	23H	; 0EE2
-finex:	CALL	L0EA3
+finex:	CALL	L0EA3			;force the fac to be sng or dbl
 	CALL	L1016
 	CALL	lopnto
 	INR	E
-strpr2:	DCR	E
+					;to check for null string
+strpr2:	DCR	E				;decrement the length
 	RZ
 	LDAX	BC
 	RST	3
@@ -2597,14 +2629,14 @@ L0F25:	SHLD	D023A
 	LHLD	STACK_TOP
 	PUSH	HL
 	LXI	HL,D022A
-lingt3:	XCHG
+lingt3:	XCHG				;save text ptr in [d,e]
 	LHLD	D0228
 	XCHG
 	RST	4
 	LXI	BC,lingt3
 	JNZ	L0F7F
 	LHLD	D024B
-L0F42:	XCHG
+L0F42:	XCHG				;save text ptr in [d,e]
 	LHLD	D024D
 	XCHG
 	RST	4
@@ -2616,7 +2648,7 @@ L0F42:	XCHG
 	CALL	L0F82
 	JMP	L0F42
 L0F55:	POP	BC
-L0F56:	XCHG
+L0F56:	XCHG				;save text ptr in [d,e]
 	LHLD	D024F
 	XCHG
 	RST	4
@@ -2651,7 +2683,7 @@ L0F56:	XCHG
 	DB	0FH	; 0F7E
 L0F7F:	PUSH	BC
 	ORI	80H
-L0F82:	MOV	A,M
+L0F82:	MOV	A,M				;get low byte of constant
 	INX	HL
 	INX	HL
 	MOV	E,M
@@ -2683,7 +2715,10 @@ L0F82:	MOV	A,M
 	PUSH	DE
 	PUSH	BC
 	RET
-grbpas:	POP	DE
+;
+; here when made one complete pass thru string vars
+;
+grbpas:	POP	DE				;pop off max pointer
 	POP	HL
 	MOV	A,L
 	ORA	H
@@ -2713,7 +2748,12 @@ grbpas:	POP	DE
 	MOV	H,B
 	DCX	HL
 	JMP	L0F25
-strcat:	PUSH	BC
+;
+; the following routine concatenates two strings
+; the faclo contains the first one at this point,
+; [h,l] points beyond the + sign after it
+;
+strcat:	PUSH	BC				;put old precedence back on
 	PUSH	HL
 	LHLD	D0253
 	XTHL
@@ -2741,7 +2781,7 @@ L0FDB:	PUSH	HL
 	XTHL
 	PUSH	HL
 	JMP	L0EC5
-movins:	POP	HL
+movins:	POP	HL				;get return addr
 	XTHL
 	MOV	A,M
 	INX	HL
@@ -2751,7 +2791,7 @@ movins:	POP	HL
 	MOV	B,M
 	MOV	L,A
 L1009:	INR	L
-movlp:	DCR	L
+movlp:	DCR	L				;set cc'S
 	RZ
 	LDAX	BC
 	STAX	DE
@@ -2761,7 +2801,7 @@ movlp:	DCR	L
 L1013:	CALL	0A87H
 L1016:	LHLD	D0253
 L1019:	XCHG
-fretmp:	CALL	fretms
+fretmp:	CALL	fretms			;free up the temporary
 	XCHG
 	RNZ
 	PUSH	DE
@@ -2777,7 +2817,7 @@ fretmp:	CALL	fretms
 	SHLD	D023A
 L1030:	POP	HL
 	RET
-fretms:	LHLD	D0228
+fretms:	LHLD	D0228			;get temp pointer
 	DCX	HL
 	MOV	B,M
 	DCX	HL
@@ -2790,7 +2830,7 @@ fretms:	LHLD	D0228
 	RET
 StmtNEW:	LXI	BC,L0DF4
 	PUSH	BC
-len1:	CALL	L1013
+len1:	CALL	L1013				;free up temp pointed to by faclo
 	XRA	A
 	MOV	D,A
 	STA	D0224
@@ -2799,7 +2839,7 @@ len1:	CALL	L1013
 	RET
 StmtSTOP:	LXI	BC,L0DF4
 	PUSH	BC
-asc2:	CALL	len1
+asc2:	CALL	len1				;set up original str
 	JZ	StmtDATA
 	INX	HL
 	INX	HL
@@ -2819,7 +2859,8 @@ StmtON:	CALL	L10ED
 	XRA	A
 L1075:	XTHL
 	MOV	C,A
-left2:	PUSH	HL
+					;the extra pop in putnew
+left2:	PUSH	HL				;save desc. for  fretmp
 	MOV	A,M
 	CMP	B
 	JC	107FH
@@ -2880,7 +2921,14 @@ L10BD:	RST	1
 	RC
 	MOV	B,E
 	RET
-StmtPOKE:	CALL	len1
+;
+; the val function takes a string and turn it into
+; a number by interpreting the ascii digits. etc..
+; except for the problem that a terminator must be supplied
+; by replacing the character beyond the string, val
+; is merely a call to floating input (fin).
+;
+StmtPOKE:	CALL	len1			;do setup, set result=real
 	JZ	L1287
 	MOV	E,A
 	INX	HL
@@ -2904,7 +2952,8 @@ StmtPOKE:	CALL	len1
 L10ED:	XCHG
 	RST	1
 	DAD	HL
-pream2:	POP	BC
+;used by mid$ for parameter checking and setup
+pream2:	POP	BC				;get return addr off stack
 	POP	DE
 	PUSH	BC
 	MOV	B,E
@@ -2941,7 +2990,8 @@ L1124:	CALL	L1131
 	INR	L
 	MVI	B,0D7H
 L1131:	CALL	L0A83
-clrhlp:	CALL	L0734
+;5.21: helper subroutine for CLEAR formula evaluation
+clrhlp:	CALL	L0734			;call helper at 22D1
 	MOV	A,D
 	ORA	A
 	JNZ	StmtDATA
@@ -3060,7 +3110,17 @@ L1212:	CALL	lopnto
 L1218:	CALL	lopnto
 	LXI	HL,0D1C1H
 L121E:	CALL	L1489
-FAdd:	MOV	A,B
+					;fall into fadd
+					;addition	fac:=arg+fac
+					;alters a,b,c,d,e,h,l
+;*****************************************************************
+;if intfsw=1 the format of floating point numbers will be:
+;reg b:sign and bits 1-7 of exponent,reg c:bit 8 of exponent
+;and bits 2-8 of mantissa,reg d:bits 9-16 of mantissa,
+;reg e:bits 17-24 of mantissa, and likewise for the fac format
+;furthermore, the exponent for intel will be bias 177 octal
+;******************************************************************
+FAdd:	MOV	A,B				;check if first argument is zero
 	ORA	A
 	RZ
 	LDA	D0256
@@ -3105,7 +3165,8 @@ L123B:	CPI	19H
 	DB	0C3H	; 125E
 	DB	0A7H	; 125F
 	DB	12H	; 1260
-fadd3:	XRA	A
+					;here to subtract c,d,e,b from ((hl)+0,1,2),0
+fadd3:	XRA	A				;subtract numbers, negate underflow byte
 	SUB	B
 	MOV	B,A
 	MOV	A,M
@@ -3120,10 +3181,16 @@ fadd3:	XRA	A
 	SBB	C
 	MOV	C,A
 L126F:	CC	L12D4
+					; was negative, fall into normalize
+					;normalize c,d,e,b
+					;alters a,b,c,d,e,h,l
+					;here we shift the mantissa left until the msb is a one.
+					;except in 4k, the idea is to shift left by 8 as many times as
+					;possible.
 normal:	MOV	L,B
 	MOV	H,E
 	XRA	A
-norm1:	MOV	B,A
+norm1:	MOV	B,A				;save shift count
 	MOV	A,C
 	ORA	A
 	JNZ	L1294
@@ -3138,7 +3205,7 @@ norm1:	MOV	B,A
 L1287:	XRA	A
 L1288:	STA	D0256
 	RET
-norm2u:	DCR	B
+norm2u:	DCR	B				;decrement shift count
 	DAD	HL
 	MOV	A,D
 	RAL
@@ -3174,7 +3241,8 @@ L12A8:	LXI	HL,D0256
 	XRA	C
 	MOV	C,A
 	JMP	movfr
-rounda:	INR	E
+					;subroutne for round:  add one to c,d,e
+rounda:	INR	E				;add one to the low order, entry from qint
 	RNZ
 	INR	D
 	RNZ
@@ -3185,7 +3253,9 @@ rounda:	INR	E
 	RNZ
 L12C3:	MVI	E,0AH
 	JMP	Error
-fadda:	MOV	A,M
+					;add (hl)+2,1,0 to c,d,e
+					;this code is used by fadd, fout
+fadda:	MOV	A,M				;get lowest order
 	ADD	E
 	MOV	E,A
 	INX	HL
@@ -3225,7 +3295,7 @@ L12EA:	SUI	08H
 	JMP	L12EA
 L12F7:	ADI	09H
 	MOV	L,A
-shftr3:	XRA	A
+shftr3:	XRA	A				;clear carry
 	DCR	L
 	RZ
 	MOV	A,C
@@ -3303,14 +3373,25 @@ L135B:	RST	5
 	PUSH	HL
 	PUSH	HL
 	LXI	HL,D0253
-fmult2:	MOV	A,M
+fmult2:	MOV	A,M				;get byte to multiply by
 	INX	HL
 	ORA	A
 	JZ	fmult3
 	PUSH	HL
 	XCHG
 	MVI	E,08H
-fmult4:	RAR
+;the product will be formed in c,d,e,b. this will be in c,h,l,b part of the
+;time in order to use the "DAD" instruction.  at fmult2, we get the next
+;byte of the mantissa in the fac to multiply by.  ((hl) points to it)
+;(the fmult2 subroutine preserves (hl))  in 8k, if the byte is zero, we just
+;shift the product 8 right.  this byte is then shifted right and saved in d
+;(h in 4k).  the carry determines if we should add in the second factor
+;if we do, we add it to c,h,l.  b is only used to determine which way we
+;round.  we then shift c,h,l,b (c,d,e,b) in 4k right one to get ready for the
+;next time through the loop.  note that the carry is shifted into the msb of
+;c.  e has a count (l in 4k) to determine when we have looked at all the bits
+;of d (h in 4k).
+fmult4:	RAR				;rotate byte right
 	MOV	D,A
 	MOV	A,C
 	JNC	fmult5
@@ -3319,7 +3400,7 @@ fmult4:	RAR
 	DAD	DE
 	POP	DE
 	ACI	00H
-fmult5:	RAR
+fmult5:	RAR				;rotate result right one
 	MOV	C,A
 	MOV	A,H
 	RAR
@@ -3336,7 +3417,7 @@ fmult5:	RAR
 	XCHG
 	POP	HL
 	RET
-fmult3:	MOV	B,E
+fmult3:	MOV	B,E				;multiply by zero: shift everything 8 right
 	MOV	E,D
 	MOV	D,C
 	MOV	C,A
@@ -3369,7 +3450,7 @@ L13B9:	RST	5
 	MOV	D,A
 	MOV	E,A
 	STA	13EBH
-fltget:	PUSH	HL
+fltget:	PUSH	HL				;save deposit pointer
 	PUSH	BC
 	MOV	A,L
 	SUI	00H
@@ -3421,7 +3502,7 @@ L141E:	LXI	HL,D0256
 	POP	HL
 	JNZ	fltget
 	JMP	L12C3
-muldiv:	MOV	A,B
+muldiv:	MOV	A,B				;is number in registers zero?
 	ORA	A
 	JZ	L144B
 	MOV	A,L
@@ -3454,7 +3535,9 @@ L144B:	POP	HL
 	DB	0C3H	; 144F
 	DB	0C3H	; 1450
 	DB	12H	; 1451
-mul10:	CALL	L14AC
+					;multiply fac by 10
+					;alters a,b,c,d,e,h,l
+mul10:	CALL	L14AC			;get number in registers
 	MOV	A,B
 	ORA	A
 	RZ
@@ -3491,7 +3574,9 @@ L1489:	LXI	HL,D0255
 	XRI	80H
 	MOV	M,A
 	RET
-pushf:	XCHG
+					;put fac on stack
+					;alters d,e
+pushf:	XCHG				;save (hl)
 	LHLD	D0253
 	XTHL
 	PUSH	HL
@@ -3501,7 +3586,10 @@ pushf:	XCHG
 	XCHG
 	RET
 L149E:	CALL	lopnto
-movfr:	XCHG
+					;fall into movfr and put it in fac
+					;move registers (b,c,d,e) to fac
+					;alters d,e
+movfr:	XCHG				;get lo'S IN (HL)
 	SHLD	D0253
 	MOV	H,B
 	MOV	L,C
@@ -3509,7 +3597,7 @@ movfr:	XCHG
 	XCHG
 	RET
 L14AC:	LXI	HL,D0253
-lopnto:	MOV	E,M
+lopnto:	MOV	E,M				;get pointer to file data block in [d,e]
 	INX	HL
 	MOV	D,M
 	INX	HL
@@ -3520,7 +3608,7 @@ L14B6:	INX	HL
 	RET
 L14B8:	LXI	DE,D0253
 L14BB:	MVI	B,04H
-move1:	LDAX	DE
+move1:	LDAX	DE				;get word, entry from vmovmf
 	MOV	M,A
 	INX	DE
 	INX	HL
@@ -3546,7 +3634,7 @@ L14C6:	LXI	HL,D0255
 	RAR
 	XRA	M
 	RET
-L14DB:	MOV	A,B
+L14DB:	MOV	A,B				;see if zero
 	ORA	A
 	JZ	FTestSign
 	LXI	HL,146DH
@@ -3562,7 +3650,7 @@ L14DB:	MOV	A,B
 	RAR
 	XRA	C
 	RET
-fcomp2:	INX	HL
+fcomp2:	INX	HL				;point to exponent
 	MOV	A,B
 	CMP	M
 	RNZ
@@ -3581,7 +3669,12 @@ fcomp2:	INX	HL
 	POP	HL
 	POP	HL
 	RET
-qint:	MOV	B,A
+					;quick greatest integer function
+					;leaves int(fac) in c,d,e (signed)
+					;assumes fac .lt. 2^23 = 8388608
+					;assumes the exponent of fac is in a
+					;alters a,b,c,d,e
+qint:	MOV	B,A				;zero b,c,d,e in case the number is zero
 	MOV	C,A
 	MOV	D,A
 	MOV	E,A
@@ -3603,7 +3696,7 @@ qint:	MOV	B,A
 	CC	L12D4
 	POP	HL
 	RET
-qinta:	DCX	DE
+qinta:	DCX	DE				;subtract one from c,d,e
 	MOV	A,D
 	ANA	E
 	INR	A
@@ -3630,7 +3723,7 @@ L154A:	LXI	HL,Start
 	ORA	C
 	RZ
 	MVI	A,10H
-umult1:	DAD	HL
+umult1:	DAD	HL				;rotate (hl) left one
 	JC	L0D3C
 	XCHG
 	DAD	HL
@@ -3685,7 +3778,8 @@ L159D:	RST	2
 	INR	C
 L15A9:	INR	C
 	JZ	L1579
-fine:	PUSH	HL
+					;here to finish up the number
+fine:	PUSH	HL				;save the text pointer
 	MOV	A,E
 	SUB	B
 L15B0:	CP	L15C6
@@ -3703,7 +3797,7 @@ L15BC:	JNZ	L15B0
 	XCHG
 	RET
 L15C6:	RZ
-L15C7:	PUSH	PSW
+L15C7:	PUSH	PSW				;save line #
 	CALL	mul10
 	POP	PSW
 	DCR	A
@@ -3724,7 +3818,9 @@ L15CE:	PUSH	DE
 	POP	BC
 	POP	DE
 	JMP	L1579
-L15E5:	CALL	pushf
+					;tangent function
+					;tan(x)=sin(x)/cos(x)
+L15E5:	CALL	pushf			;save arg
 	CALL	L1474
 	POP	BC
 	POP	DE
@@ -3810,7 +3906,7 @@ L1674:	DCR	B
 	CALL	L14AC
 	POP	HL
 	MVI	B,2FH
-foucs2:	INR	B
+foucs2:	INR	B				;add one to digit
 	MOV	A,E
 	SUB	M
 	MOV	E,A
@@ -3860,7 +3956,7 @@ L16C6:	INR	B
 	ADI	3AH
 	INX	HL
 	MOV	M,B
-L16D0:	INX	HL
+L16D0:	INX	HL				;store [d,e]=pointer to free space
 	MOV	M,A
 	INX	HL
 Exp:	MOV	M,C
@@ -3932,7 +4028,7 @@ posexp:	ORA	A
 	DB	0E1H	; 1730
 	DB	7CH	; 1731
 	DB	1FH	; 1732
-fpwr1:	POP	HL
+fpwr1:	POP	HL				;get x back in fac
 	SHLD	D0255
 	POP	HL
 	SHLD	D0253
@@ -4011,7 +4107,14 @@ L17AC:	CALL	pushf
 	CALL	L14AC
 	CALL	L135B
 	POP	HL
-poly:	CALL	pushf
+					;fall into poly
+					;polynomial evaluator
+					;pointer to degree+1 is in (hl), it is updated
+					;the constants follow the degree
+					;constants should be stored in reverse order, fac has x
+					;we compute:
+					; c0+c1*x+c2*x^2+c3*x^3+...+c(n-1)*x^(n-1)+c(n)*x^n
+poly:	CALL	pushf				;save x
 	MOV	A,M
 	INX	HL
 	CALL	L149E
@@ -4062,7 +4165,7 @@ StmtGOTO:	RST	5
 	MOV	C,A
 	DAD	BC
 	CALL	L1212
-rnd1:	CALL	L14AC
+rnd1:	CALL	L14AC				;switch ho and lo bytes,
 	MOV	A,E
 	MOV	E,C
 	XRI	4FH
@@ -4083,7 +4186,7 @@ rnd1:	CALL	L14AC
 L1832:	CALL	normal
 	LXI	HL,D1866
 	JMP	L14B8
-rndstr:	MOV	M,A
+rndstr:	MOV	M,A				;zero the counters
 	DCX	HL
 	MOV	M,A
 	DCX	HL
@@ -4201,7 +4304,9 @@ D18C4:	DB	05H	; 18C4
 	DB	0FH	; 18D6
 	DB	49H	; 18D7
 	DB	83H	; 18D8
-Cos:	CALL	pushf
+					;tangent function
+					;tan(x)=sin(x)/cos(x)
+Cos:	CALL	pushf				;save arg
 	CALL	L187C
 	POP	BC
 	POP	HL
@@ -4438,7 +4543,11 @@ L1A28:	LXI	HL,szMemorySize
 	ORA	A
 	JNZ	L1A51
 	LXI	HL,D1BC9
-scnstr:	INX	HL
+;
+; here when passing over string literal in subscript of variable in input list
+; on the first pass of input checking for type match and number
+;
+scnstr:	INX	HL				;look at the next character
 	MOV	A,H
 	ORA	L
 	JZ	FindMemTop
