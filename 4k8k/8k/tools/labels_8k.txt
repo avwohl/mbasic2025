@@ -1,0 +1,110 @@
+# 8K BASIC Label Mappings (from 4K pattern matching)
+# Format: address,label_name
+#
+# RST routines (same as 4K)
+0000,Start
+0008,SyntaxCheck
+0010,NextChar
+0018,OutChar
+0020,CompareHLDE
+0026,TERMINAL_Y
+0027,TERMINAL_X
+0028,FTestSign
+#
+# System variables (similar to 4K, different addresses)
+01D0,CTRL_O_FLAG
+01D1,SUPPRESS_OUTPUT
+01D2,STACK_TOP
+01D4,CURRENT_LINE
+01D6,PROGRAM_BASE
+01D8,COMMA_PREFIX
+01D9,LINE_BUFFER
+#
+# Tables
+0043,STMT_DISPATCH
+0073,KEYWORDS
+0155,FN_DISPATCH
+01AA,ERROR_CODES
+#
+# Messages
+003D,szBreak
+0265,szError
+026C,szIn
+0271,szOK
+1B1B,szWantSinCosTanAtn
+1B30,szMicrosoft
+1B59,szTerminalWidth
+1B68,szMemorySize
+1B74,szBytesFree
+1B81,szVersion
+1B98,szEightK
+1BAB,szCopyright
+#
+# Core routines (mapped from 4K)
+0276,GetFlowPtr
+0297,CopyMemoryUp
+02A6,CheckEnoughVarSpace
+02BB,OutOfMemory
+02C6,SyntaxError
+02D1,Error
+02F7,Main
+034E,GetNonBlankLine
+03B1,InputLineWithQ
+0444,Tokenize
+0495,List
+04D4,For
+05B7,Print
+05C9,PrintLoop
+05DE,PrintTab
+0653,NextChar_tail
+0689,Input
+069C,Read
+0728,LetAssign
+0752,LineNumToInt
+079C,Gosub
+07A8,Goto
+07D5,Return
+07FA,Restore
+0816,FindNextStmt
+0853,Rem
+0899,Next
+#
+# Floating point routines
+0988,FMul
+09BB,FDiv
+0A3A,FNegate
+0A94,Abs
+0ACA,Int
+0B44,Sgn
+0C3F,Sqr
+0C76,Rnd
+1221,FAdd
+12E8,FShiftRight
+131D,FCompare
+#
+# Trig functions
+1876,Sin
+18D9,Cos
+193A,Tan
+1953,Atn
+#
+# String functions
+1105,Len
+110B,Asc
+1159,Chr
+1185,Left
+11F9,Right
+1200,Mid
+121C,Val
+#
+# Init
+1A0B,Init
+1A5D,FindMemTop
+1ADD,SetupTrigFns
+#
+# Other
+1604,PrintInt
+161B,FOut
+1647,FIn
+16D3,Exp
+16FF,Log

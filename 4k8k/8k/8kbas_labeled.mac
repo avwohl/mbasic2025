@@ -188,16 +188,16 @@ keywords:
 	rdc	<THEN>
 	rdc	<NOT>
 	rdc	<STEP>
-	db 0ABH				;+
-	db 0ADH				;-
-	db 0AAH				;*
-	db 0AFH				;/
-	db 0DEH				;^
+	rdc	<!+>
+	rdc	<!->
+	rdc	<!*>
+	rdc	<!/>
+	rdc	<!^>
 	rdc	<AND>
 	rdc	<OR>
-	db 0BEH				;>
-	db 0BDH				;=
-	db 0BCH				;<
+	rdc	<!>>
+	rdc	<!=>
+	db	'<'+80h			;<
 	rdc	<SGN>
 	rdc	<INT>
 	rdc	<ABS>
