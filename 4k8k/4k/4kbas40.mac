@@ -7,19 +7,34 @@
 
 	.8080
 
-	ORG	0000H
+; Macro: rdc - Reverse DC (high bit on FIRST character instead of last)
+; Usage: rdc 'STRING' outputs first char with high bit set, rest normal
+rdc	macro	str
+	local	first
+first	set	1
+	irpc	ch,<str>
+	if	first
+	db	'&ch' + 80h
+first	set	0
+	else
+	db	'&ch'
+	endif
+	endm
+	endm
+
+	org	0000H
 
 ;=============================================================================
 ; RST 0 - Start / Cold Boot Entry Point
 ; The loader jumps here after loading BASIC from paper tape.
 ; Disables interrupts and jumps to initialization code.
 ;=============================================================================
-Start:	DI			; Disable interrupts
-	JMP	Init		; Jump to initialization
+Start:	di			; Disable interrupts
+	jmp	Init		; Jump to initialization
 
 ; Unused function pointers (possibly for 8K BASIC compatibility)
-	DW	049EH		; Unused pointer
-	DW	0807H		; Unused pointer (FWordToFloat in 3.2)
+	dw	049EH		; Unused pointer
+	dw	0807H		; Unused pointer (FWordToFloat in 3.2)
 
 ;=============================================================================
 ; RST 1 - SyntaxCheck
@@ -29,12 +44,12 @@ Start:	DI			; Disable interrupts
 ; and execution falls into NextChar. This saves 2 bytes on every syntax check.
 ;=============================================================================
 SyntaxCheck:
-	MOV	A,M		; A = current byte of BASIC program
-	XTHL			; HL = return address (points to expected byte)
-	CMP	M		; Compare program byte to expected byte
-	INX	HL		; Advance return address past expected byte
-	XTHL			; Restore HL, put adjusted return addr back
-	JNZ	SyntaxError	; Error if bytes don't match
+	mov	a,m		; A = current byte of BASIC program
+	xthl			; HL = return address (points to expected byte)
+	cmp	m		; Compare program byte to expected byte
+	inx	hl		; Advance return address past expected byte
+	xthl			; Restore HL, put adjusted return addr back
+	jnz	SyntaxError	; Error if bytes don't match
 				; Fall through to NextChar if match
 
 ;=============================================================================
@@ -44,21 +59,21 @@ SyntaxCheck:
 ; Zero flag is set if null terminator reached.
 ;=============================================================================
 NextChar:
-	INX	HL		; Advance to next character
-	MOV	A,M		; Get character
-	CPI	':'		; Compare to colon (statement separator)
-	RNC			; Return if >= ':' (not special)
-	JMP	NextChar_tail	; Handle spaces and digits
+	inx	hl		; Advance to next character
+	mov	a,m		; Get character
+	cpi	':'		; Compare to colon (statement separator)
+	rnc			; Return if >= ':' (not special)
+	jmp	NextChar_tail	; Handle spaces and digits
 
 ;=============================================================================
 ; RST 3 - OutChar
 ; Outputs character in A to terminal, tracking cursor position.
 ;=============================================================================
 OutChar:
-	PUSH	PSW		; Save character
-	LDA	TERMINAL_X	; Get current X position
-	JMP	OutChar_tail	; Continue in main code
-	NOP			; Pad to 8 bytes
+	push	psw		; Save character
+	lda	TERMINAL_X	; Get current X position
+	jmp	OutChar_tail	; Continue in main code
+	nop			; Pad to 8 bytes
 
 ;=============================================================================
 ; RST 4 - CompareHLDE
@@ -66,16 +81,16 @@ OutChar:
 ; as standard 8-bit compares. Returns Z if HL==DE.
 ;=============================================================================
 CompareHLDE:
-	MOV	A,H		; Compare high bytes first
-	SUB	D
-	RNZ			; Return if high bytes differ
-	MOV	A,L		; Compare low bytes
-	SUB	E
-	RET
+	mov	a,h		; Compare high bytes first
+	sub	d
+	rnz			; Return if high bytes differ
+	mov	a,l		; Compare low bytes
+	sub	e
+	ret
 
 ; Terminal cursor position tracking
-TERMINAL_Y:	DB	01H	; Current Y position (row)
-TERMINAL_X:	DB	00H	; Current X position (column)
+TERMINAL_Y:	db	01H	; Current Y position (row)
+TERMINAL_X:	db	00H	; Current X position (column)
 
 ;=============================================================================
 ; RST 5 - FTestSign
@@ -85,10 +100,10 @@ TERMINAL_X:	DB	00H	; Current X position (column)
 ;          A=0x01 if positive
 ;=============================================================================
 FTestSign:
-	LDA	FACCUM_EXP	; Get exponent byte of FACCUM
-	ORA	A		; Test if zero
-	JNZ	FTestSign_tail	; If not zero, determine sign
-	RET			; Return with A=0, Z set
+	lda	FACCUM_EXP	; Get exponent byte of FACCUM
+	ora	a		; Test if zero
+	jnz	FTestSign_tail	; If not zero, determine sign
+	ret			; Return with A=0, Z set
 
 ;=============================================================================
 ; RST 6 - PushNextWord (0x0030-0x0037)
@@ -96,183 +111,210 @@ FTestSign:
 ; Uses self-modifying code for the return jump.
 ; The first 8 bytes (RST 6 slot) set up and jump to continuation.
 ;=============================================================================
-	DB	0E3H		; XTHL - get return address into HL
-	DB	22H		; SHLD PushRet+1 (store return address)
-	DB	LOW PushRet+1
-	DB	HIGH PushRet+1
-	DB	0E1H		; POP HL - restore original HL
-	DB	0C3H		; JMP PushNextWord
-	DB	LOW PushNextWord
-	DB	HIGH PushNextWord
+	db	0E3H		; XTHL - get return address into HL
+	db	22H		; SHLD PushRet+1 (store return address)
+	db	low PushRet+1
+	db	high PushRet+1
+	db	0E1H		; POP HL - restore original HL
+	db	0C3H		; JMP PushNextWord
+	db	low PushNextWord
+	db	high PushNextWord
 ;-----------------------------------------------------------------------------
 ; RST 7 slot (0x38-0x3A) - Data bytes for I/O patching
 ;-----------------------------------------------------------------------------
-	DB	0C9H		; RET opcode byte (used for I/O config)
-	DW	0154H		; Additional I/O configuration bytes
+	db	0C9H		; RET opcode byte (used for I/O config)
+	dw	0154H		; Additional I/O configuration bytes
 ;-----------------------------------------------------------------------------
 ; PushNextWord continuation (0x003B)
 ;-----------------------------------------------------------------------------
 PushNextWord:
-	MOV	C,M		; Load low byte
-	INX	HL
-	MOV	B,M		; Load high byte
-	INX	HL		; Advance HL past the word
-	PUSH	BC		; Push the word onto stack
+	mov	c,m		; Load low byte
+	inx	hl
+	mov	b,m		; Load high byte
+	inx	hl		; Advance HL past the word
+	push	bc		; Push the word onto stack
 PushRet:
-	JMP	PushRet		; Self-modifying: jump to return address
+	jmp	PushRet		; Self-modifying: jump to return address
 ;=============================================================================
 ; Function Pointer Tables for Inline Functions
 ; These are the math functions that can be used in expressions (SGN, INT, etc.)
 ;=============================================================================
 KW_INLINE_FNS:
-	DW	Sgn		; SGN - return sign of number
-	DW	Int		; INT - truncate to integer
-	DW	Abs		; ABS - absolute value
-	DW	FunctionCallError ; USR - user function (not impl in 4K)
-	DW	Sqr		; SQR - square root
-	DW	Rnd		; RND - random number
+	dw	Sgn		; SGN - return sign of number
+	dw	Int		; INT - truncate to integer
+	dw	Abs		; ABS - absolute value
+	dw	FunctionCallError ; USR - user function (not impl in 4K)
+	dw	Sqr		; SQR - square root
+	dw	Rnd		; RND - random number
 SinEntry:
-	DB	0A0H		; Sin function entry byte
+	db	0A0H		; Sin function entry byte
 KW_INLINE_FNS_END:
-	DB	0CH		; End marker for inline functions
+	db	0CH		; End marker for inline functions
 
 ;=============================================================================
 ; Keyword String Table - exact bytes from reference binary
-; Each keyword has its LAST character with high bit set as end marker.
+; Each keyword has its FIRST character with high bit set as start marker.
 ; Token values start at 80H for END, 81H for FOR, etc.
-; Format uses overlapping suffixes for compact storage.
 ;=============================================================================
 KEYWORDS:
-	DB	0C5H, 04EH, 044H, 0C6H, 04FH, 052H, 0CEH, 045H, 058H, 054H, 0C4H, 041H
-	DB	054H, 041H, 0C9H, 04EH, 050H, 055H, 054H, 0C4H, 049H, 04DH, 0D2H, 045H
-	DB	041H, 044H, 0CCH, 045H, 054H, 0C7H, 04FH, 054H, 04FH, 0D2H, 055H, 04EH
-	DB	0C9H, 046H, 0D2H, 045H, 053H, 054H, 04FH, 052H, 045H, 0C7H, 04FH, 053H
-	DB	055H, 042H, 0D2H, 045H, 054H, 055H, 052H, 04EH, 0D2H, 045H, 04DH, 0D3H
-	DB	054H, 04FH, 050H, 0D0H, 052H, 049H, 04EH, 054H, 0CCH, 049H, 053H, 054H
-	DB	0C3H, 04CH, 045H, 041H, 052H, 0CEH, 045H, 057H, 0D4H, 041H, 042H, 028H
-	DB	0D4H, 04FH, 0D4H, 048H, 045H, 04EH, 0D3H, 054H, 045H, 050H, 0ABH, 0ADH
-	DB	0AAH, 0AFH, 0BEH, 0BDH, 0BCH, 0D3H, 047H, 04EH, 0C9H, 04EH, 054H, 0C1H
-	DB	042H, 053H, 0D5H, 053H, 052H, 0D3H, 051H, 052H, 0D2H, 04EH, 044H, 0D3H
-	DB	049H, 04EH, 080H	; 80H marks end of SIN and keyword table
+	rdc	<END>
+	rdc	<FOR>
+	rdc	<NEXT>
+	rdc	<DATA>
+	rdc	<INPUT>
+	rdc	<DIM>
+	rdc	<READ>
+	rdc	<LET>
+	rdc	<GOTO>
+	rdc	<RUN>
+	rdc	<IF>
+	rdc	<RESTORE>
+	rdc	<GOSUB>
+	rdc	<RETURN>
+	rdc	<REM>
+	rdc	<STOP>
+	rdc	<PRINT>
+	rdc	<LIST>
+	rdc	<CLEAR>
+	rdc	<NEW>
+	rdc	<TAB(>
+	rdc	<TO>
+	rdc	<THEN>
+	rdc	<STEP>
+	rdc	<+>
+	rdc	<->
+	rdc	<*>
+	rdc	</>
+	rdc	<!>>
+	rdc	<=>
+	rdc	<!<>
+	rdc	<SGN>
+	rdc	<INT>
+	rdc	<ABS>
+	rdc	<USR>
+	rdc	<SQR>
+	rdc	<RND>
+	rdc	<SIN>
+	db	80h		; End of keyword table
 ;=============================================================================
 ; General Keyword Function Pointer Table
 ; Indexed by (token - 80H) * 2 to get function address
 ;=============================================================================
 KW_GENERAL_FNS:
-	DW	Stop		; 80 - END (same as STOP)
-	DW	For		; 81 - FOR
-	DW	Next		; 82 - NEXT
-	DW	FindNextStatement ; 83 - DATA (skip to next statement)
-	DW	Input		; 84 - INPUT
-	DW	Dim		; 85 - DIM
-	DW	Read		; 86 - READ
-	DW	Let		; 87 - LET
-	DW	Goto		; 88 - GOTO
-	DW	Clear		; 89 - RUN (clear then run)
-	DW	If		; 8A - IF
-	DW	Restore		; 8B - RESTORE
-	DW	Gosub		; 8C - GOSUB
-	DW	Return		; 8D - RETURN
-	DW	Rem		; 8E - REM
-	DW	Stop		; 8F - STOP
-	DW	Print		; 90 - PRINT
-	DW	List		; 91 - LIST
-	DW	ResetAll	; 92 - CLEAR
-	DW	New		; 93 - NEW
+	dw	Stop		; 80 - END (same as STOP)
+	dw	For		; 81 - FOR
+	dw	Next		; 82 - NEXT
+	dw	FindNextStatement ; 83 - DATA (skip to next statement)
+	dw	Input		; 84 - INPUT
+	dw	Dim		; 85 - DIM
+	dw	Read		; 86 - READ
+	dw	Let		; 87 - LET
+	dw	Goto		; 88 - GOTO
+	dw	Clear		; 89 - RUN (clear then run)
+	dw	If		; 8A - IF
+	dw	Restore		; 8B - RESTORE
+	dw	Gosub		; 8C - GOSUB
+	dw	Return		; 8D - RETURN
+	dw	Rem		; 8E - REM
+	dw	Stop		; 8F - STOP
+	dw	Print		; 90 - PRINT
+	dw	List		; 91 - LIST
+	dw	ResetAll	; 92 - CLEAR
+	dw	New		; 93 - NEW
 
 ;=============================================================================
 ; Arithmetic Operator Table
 ; Each entry: precedence (1 byte), function address (2 bytes)
 ;=============================================================================
 KW_ARITH_OP_FNS:
-	DB	79H		; + precedence
-	DW	FAddEntry	; + function (entry point with POP BC/DE)
-	DB	79H		; - precedence
-	DW	FSubEntry	; - function (entry point with POP BC/DE)
-	DB	7CH		; * precedence (higher than +/-)
-	DW	FMulEntry	; * function (entry point with POP BC/DE)
-	DB	7CH		; / precedence
-	DW	FDivEntry	; / function (entry point with POP BC/DE)
+	db	79H		; + precedence
+	dw	FAddEntry	; + function (entry point with POP BC/DE)
+	db	79H		; - precedence
+	dw	FSubEntry	; - function (entry point with POP BC/DE)
+	db	7CH		; * precedence (higher than +/-)
+	dw	FMulEntry	; * function (entry point with POP BC/DE)
+	db	7CH		; / precedence
+	dw	FDivEntry	; / function (entry point with POP BC/DE)
 
 ;=============================================================================
 ; Error Code Table
 ; Two-character codes for each error type (indexed by error number)
 ;=============================================================================
 ERROR_CODES:
-	DB	'NF'		; 00 - NEXT without FOR
-	DB	'SN'		; 02 - Syntax error
-	DB	'RG'		; 04 - RETURN without GOSUB
-	DB	'OD'		; 06 - Out of Data
-	DB	'FC'		; 08 - Illegal Function Call
-	DB	'OV'		; 0A - Overflow
-	DB	'OM'		; 0C - Out of Memory
-	DB	'UL'		; 0E - Undefined Line
-	DB	'BS'		; 10 - Bad Subscript
-	DB	'DD'		; 12 - Duplicate Definition
-	DB	'/0'		; 14 - Division by Zero
-	DB	'ID'		; 16 - Illegal Direct mode
+	db	'NF'		; 00 - NEXT without FOR
+	db	'SN'		; 02 - Syntax error
+	db	'RG'		; 04 - RETURN without GOSUB
+	db	'OD'		; 06 - Out of Data
+	db	'FC'		; 08 - Illegal Function Call
+	db	'OV'		; 0A - Overflow
+	db	'OM'		; 0C - Out of Memory
+	db	'UL'		; 0E - Undefined Line
+	db	'BS'		; 10 - Bad Subscript
+	db	'DD'		; 12 - Duplicate Definition
+	db	'/0'		; 14 - Division by Zero
+	db	'ID'		; 16 - Illegal Direct mode
 
 ;=============================================================================
 ; Global Variables
 ;=============================================================================
-STACK_TOP:	DW	0F40H	; Highest memory address for stack
-CURRENT_LINE:	DW	0FFFEH	; Line number being executed (FFFF = direct mode)
-PROGRAM_BASE:	DW	0F41H	; Start of program storage
-COMMA_PREFIX:	DB	','	; Prefix for LINE_BUFFER (used by READ/INPUT)
-LINE_BUFFER:	DS	8	; Input buffer (continues to 72 chars total)
+STACK_TOP:	dw	0F40H	; Highest memory address for stack
+CURRENT_LINE:	dw	0FFFEH	; Line number being executed (FFFF = direct mode)
+PROGRAM_BASE:	dw	0F41H	; Start of program storage
+COMMA_PREFIX:	db	','	; Prefix for LINE_BUFFER (used by READ/INPUT)
+LINE_BUFFER:	ds	8	; Input buffer (continues to 72 chars total)
 
 ;=============================================================================
 ; String Constants
 ;=============================================================================
 szBytesFree:
-	DB	' BYTES FREE',0DH
+	db	' BYTES FREE',0DH
 szVersion:
-	DB	'4K BASIC 4.0',0DH
+	db	'4K BASIC 4.0',0DH
 szCopyright:
-	DB	'COPYRIGHT MITS 1976',0
+	db	'COPYRIGHT MITS 1976',0
 ; Jump table for I/O routines (modified by Init for different hardware)
-IO_WAIT_IN:	DW	0393H		; Wait for input ready routine
-IO_GET_CHAR:	DW	0384H		; Get character routine
-IO_PUT_CHAR:	DW	0481H		; Put character routine
+IO_WAIT_IN:	dw	0393H		; Wait for input ready routine
+IO_GET_CHAR:	dw	0384H		; Get character routine
+IO_PUT_CHAR:	dw	0481H		; Put character routine
 
 ; More global variables (initialized to 0)
-	DW	0		; Reserved
-RANDOM_SEED:	DW	0D69H		; Random number seed
-EXPR_STACK:	DW	0D92H		; Expression evaluation stack pointer
-	DW	0		; Reserved
-	DW	0		; Reserved
-	DW	0		; Reserved
-	DW	0		; Reserved
-	DB	0		; Reserved (odd byte to match reference)
-DIM_OR_EVAL:	DB	0		; Flag: 0=evaluating, NZ=DIM'ing
-INPUT_OR_READ:	DB	0		; Flag: 0=INPUT, NZ=READ
-PROG_PTR_TEMP:	DW	0		; Temporary program pointer
-EXPR_PTR_TEMP:	DW	0		; Expression evaluator temp pointer
-VAR_BASE:	DW	0		; Start of variable storage
-VAR_ARRAY_BASE:	DW	0		; Start of array storage
-VAR_TOP:	DW	0		; Top of variable/array storage
-DATA_PROG_PTR:	DW	0		; Current DATA statement pointer
+	dw	0		; Reserved
+RANDOM_SEED:	dw	0D69H		; Random number seed
+EXPR_STACK:	dw	0D92H		; Expression evaluation stack pointer
+	dw	0		; Reserved
+	dw	0		; Reserved
+	dw	0		; Reserved
+	dw	0		; Reserved
+	db	0		; Reserved (odd byte to match reference)
+DIM_OR_EVAL:	db	0		; Flag: 0=evaluating, NZ=DIM'ing
+INPUT_OR_READ:	db	0		; Flag: 0=INPUT, NZ=READ
+PROG_PTR_TEMP:	dw	0		; Temporary program pointer
+EXPR_PTR_TEMP:	dw	0		; Expression evaluator temp pointer
+VAR_BASE:	dw	0		; Start of variable storage
+VAR_ARRAY_BASE:	dw	0		; Start of array storage
+VAR_TOP:	dw	0		; Top of variable/array storage
+DATA_PROG_PTR:	dw	0		; Current DATA statement pointer
 
 ; Floating point accumulator (FACCUM) - 4 bytes
-FACCUM:		DB	0		; FACCUM byte 0 (low mantissa)
-FACCUM_1:	DB	0		; FACCUM byte 1
-FACCUM_2:	DB	0		; FACCUM byte 2 (high mantissa + sign)
-FACCUM_EXP:	DB	0		; FACCUM exponent
+FACCUM:		db	0		; FACCUM byte 0 (low mantissa)
+FACCUM_1:	db	0		; FACCUM byte 1
+FACCUM_2:	db	0		; FACCUM byte 2 (high mantissa + sign)
+FACCUM_EXP:	db	0		; FACCUM exponent
 
-FTEMP_SIGN:	DB	0		; Temp sign during FP operations
+FTEMP_SIGN:	db	0		; Temp sign during FP operations
 
 ; FBUFFER - 13 byte buffer used by FOut and Sqr
-FBUFFER:	DS	13		; Float output/sqrt buffer
+FBUFFER:	ds	13		; Float output/sqrt buffer
 
 ;=============================================================================
 ; More String Constants
 ;=============================================================================
 szError:
-	DB	' ERROR',0
+	db	' ERROR',0
 szIn:
-	DB	' IN ',0
+	db	' IN ',0
 szOK:
-	DB	0DH,'OK',0DH,0
+	db	0DH,'OK',0DH,0
 ;=============================================================================
 ; GetFlowPtr - Find Flow Control Structure on Stack
 ; Sets HL to point to the appropriate flow struct (FOR/GOSUB) on stack.
@@ -280,22 +322,22 @@ szOK:
 ; Returns with A = keyword ID byte (81H for FOR, 8CH for GOSUB)
 ;=============================================================================
 GetFlowPtr:
-	LXI	HL,4		; Skip past 2 return addresses on stack
-	DAD	SP		; HL = SP + 4
+	lxi	hl,4		; Skip past 2 return addresses on stack
+	dad	sp		; HL = SP + 4
 GetFlowLoop:
-	MOV	A,M		; Get keyword ID byte
-	INX	HL		; Point to flow struct
-	CPI	81H		; Is it FOR (81H)?
-	RNZ			; Return if not FOR (found GOSUB or end)
+	mov	a,m		; Get keyword ID byte
+	inx	hl		; Point to flow struct
+	cpi	81H		; Is it FOR (81H)?
+	rnz			; Return if not FOR (found GOSUB or end)
 	; For FOR structs, check if variable matches
-	RST	6		; Push (HL) = variable address from FOR
-	XTHL			; HL = variable address
-	RST	4		; Compare HL with DE (NEXT's variable)
-	LXI	BC,13		; Size of FOR flow struct
-	POP	HL		; Restore HL
-	RZ			; Return if variables match
-	DAD	BC		; Skip to next flow struct
-	JMP	GetFlowLoop	; Try next struct
+	rst	6		; Push (HL) = variable address from FOR
+	xthl			; HL = variable address
+	rst	4		; Compare HL with DE (NEXT's variable)
+	lxi	bc,13		; Size of FOR flow struct
+	pop	hl		; Restore HL
+	rz			; Return if variables match
+	dad	bc		; Skip to next flow struct
+	jmp	GetFlowLoop	; Try next struct
 
 ;=============================================================================
 ; CopyMemoryUp - Copy Memory Block Upward
@@ -303,29 +345,29 @@ GetFlowLoop:
 ; Used to make room for inserting program lines.
 ;=============================================================================
 CopyMemoryUp:
-	CALL	CheckEnoughMem+1 ; Skip MVI A,E5H - enters at PUSH HL (E5 byte)
-	PUSH	BC		; Exchange BC and HL
-	XTHL
-	POP	BC
+	call	CheckEnoughMem+1 ; Skip MVI A,E5H - enters at PUSH HL (E5 byte)
+	push	bc		; Exchange BC and HL
+	xthl
+	pop	bc
 CopyMemLoop:
-	RST	4		; Compare HL and DE
-	MOV	A,M		; Get source byte
-	STAX	BC		; Store to destination
-	RZ			; Done when HL==DE
-	DCX	BC		; Move backward
-	DCX	HL
-	JMP	CopyMemLoop
+	rst	4		; Compare HL and DE
+	mov	a,m		; Get source byte
+	stax	bc		; Store to destination
+	rz			; Done when HL==DE
+	dcx	bc		; Move backward
+	dcx	hl
+	jmp	CopyMemLoop
 
 ;=============================================================================
 ; CheckEnoughVarSpace - Check Variable Storage Space
 ; Checks that there's room for C*2 bytes on top of VAR_TOP before stack.
 ;=============================================================================
 CheckEnoughVarSpace:
-	PUSH	HL
-	LHLD	VAR_TOP		; Get top of variable storage
-	MVI	B,0		; BC = C * 2
-	DAD	BC
-	DAD	BC
+	push	hl
+	lhld	VAR_TOP		; Get top of variable storage
+	mvi	b,0		; BC = C * 2
+	dad	bc
+	dad	bc
 ; Fall through to CheckEnoughMem
 
 ;=============================================================================
@@ -334,179 +376,179 @@ CheckEnoughVarSpace:
 ; If not, falls through to OutOfMemory error.
 ;=============================================================================
 CheckEnoughMem:
-	MVI	A,0E5H		; Calculate FFDE - HL (-34 bytes margin)
-	MVI	A,0DEH		; (Self-modifying: first byte overwritten)
-	SUB	L
-	MOV	L,A
-	MVI	A,0FFH
-	SBB	H
-	MOV	H,A
-	DAD	SP		; Add stack pointer
-	POP	HL
-	RC			; Return if enough room (no carry)
+	mvi	a,0E5H		; Calculate FFDE - HL (-34 bytes margin)
+	mvi	a,0DEH		; (Self-modifying: first byte overwritten)
+	sub	l
+	mov	l,a
+	mvi	a,0FFH
+	sbb	h
+	mov	h,a
+	dad	sp		; Add stack pointer
+	pop	hl
+	rc			; Return if enough room (no carry)
 
 ;=============================================================================
 ; Error Entry Points
 ; Uses LXI trick: LXI B,xxxx is 01 xx xx, which skips over 2 bytes
 ;=============================================================================
 OutOfMemory:
-	MVI	E,0CH		; Error code 0C (OM - Out of Memory)
-	DB	01H		; LXI B opcode - skip next 2 bytes
+	mvi	e,0CH		; Error code 0C (OM - Out of Memory)
+	db	01H		; LXI B opcode - skip next 2 bytes
 SyntaxError:
-	MVI	E,02H		; Error code 02 (SN - Syntax error)
-	DB	01H		; LXI B opcode - skip next 2 bytes
+	mvi	e,02H		; Error code 02 (SN - Syntax error)
+	db	01H		; LXI B opcode - skip next 2 bytes
 DivByZero:
-	MVI	E,14H		; Error code 14 (/0 - Division by Zero)
+	mvi	e,14H		; Error code 14 (/0 - Division by Zero)
 ;=============================================================================
 ; Error - Print Error Message and Return to Main Loop
 ; E = error code (offset into ERROR_CODES table)
 ;=============================================================================
 Error:
-	CALL	ResetStack	; Reset stack pointer
-	CALL	NewLine		; Print newline
-	LXI	HL,ERROR_CODES	; Point to error code table
-	MOV	D,A		; D = 0 (from NewLine)
-	MVI	A,'?'		; Print '?'
-	RST	3
-	DAD	DE		; HL = ERROR_CODES + E
-	MOV	A,M		; Get first char of error code
-	RST	3		; Print it
-	RST	2		; Advance HL, get second char
-	RST	3		; Print it
-	LXI	HL,szError	; Point to " ERROR" string
-	CALL	PrintString+1	; Print it (skip INX HL)
-	LHLD	CURRENT_LINE	; Get current line number
-	MOV	A,H		; Check if in direct mode (FFFF)
-	ANA	L
-	INR	A		; A = 0 if FFFF (direct mode)
-	CNZ	PrintIN		; Print " IN <line>" if running program
-	DB	01H		; LXI B - skip next 2 bytes
+	call	ResetStack	; Reset stack pointer
+	call	NewLine		; Print newline
+	lxi	hl,ERROR_CODES	; Point to error code table
+	mov	d,a		; D = 0 (from NewLine)
+	mvi	a,'?'		; Print '?'
+	rst	3
+	dad	de		; HL = ERROR_CODES + E
+	mov	a,m		; Get first char of error code
+	rst	3		; Print it
+	rst	2		; Advance HL, get second char
+	rst	3		; Print it
+	lxi	hl,szError	; Point to " ERROR" string
+	call	PrintString+1	; Print it (skip INX HL)
+	lhld	CURRENT_LINE	; Get current line number
+	mov	a,h		; Check if in direct mode (FFFF)
+	ana	l
+	inr	a		; A = 0 if FFFF (direct mode)
+	cnz	PrintIN		; Print " IN <line>" if running program
+	db	01H		; LXI B - skip next 2 bytes
 
 ;=============================================================================
 ; Stop / End - Stop Program Execution
 ; STOP and END keywords are synonymous
 ;=============================================================================
 Stop:
-	RNZ			; Syntax error if arguments given
+	rnz			; Syntax error if arguments given
 StopPop:
-	POP	BC		; Discard return address
+	pop	bc		; Discard return address
 StopCont:
-	MVI	A,0C1H		; (Placeholder byte - part of LXI trick)
+	mvi	a,0C1H		; (Placeholder byte - part of LXI trick)
 
 ;=============================================================================
 ; Main - The BASIC Prompt Loop
 ; Prints "OK", gets user input, and either executes or stores program lines
 ;=============================================================================
 Main:
-	LXI	HL,szOK		; Point to "\rOK\r" string
-	CALL	Init		; First time: Init (patched to PrintString after)
+	lxi	hl,szOK		; Point to "\rOK\r" string
+	call	Init		; First time: Init (patched to PrintString after)
 ;-----------------------------------------------------------------------------
 ; GetNonBlankLine - Get a line of input from the user
 ;-----------------------------------------------------------------------------
 GetNonBlankLine:
-	LXI	HL,0FFFFH	; Set line number to FFFF (direct mode)
-	SHLD	CURRENT_LINE
-	CALL	InputLine	; Get line of input
-	RST	2		; Get first char
-	INR	A		; Test if A==0 without affecting carry
-	DCR	A		; (INR/DCR don't affect carry)
-	JZ	GetNonBlankLine	; Loop if blank line
-	PUSH	PSW		; Save carry flag (set if first char is digit)
-	CALL	LineNumberFromStr ; Try to parse line number into DE
-	PUSH	DE		; Save line number
-	CALL	Tokenize	; Tokenize the input line
-	MOV	B,A		; B = 0 (from Tokenize), BC = line length
-	POP	DE		; DE = line number
-	POP	PSW		; Restore carry flag
-	JNC	Exec		; If no line number, execute immediately
+	lxi	hl,0FFFFH	; Set line number to FFFF (direct mode)
+	shld	CURRENT_LINE
+	call	InputLine	; Get line of input
+	rst	2		; Get first char
+	inr	a		; Test if A==0 without affecting carry
+	dcr	a		; (INR/DCR don't affect carry)
+	jz	GetNonBlankLine	; Loop if blank line
+	push	psw		; Save carry flag (set if first char is digit)
+	call	LineNumberFromStr ; Try to parse line number into DE
+	push	de		; Save line number
+	call	Tokenize	; Tokenize the input line
+	mov	b,a		; B = 0 (from Tokenize), BC = line length
+	pop	de		; DE = line number
+	pop	psw		; Restore carry flag
+	jnc	Exec		; If no line number, execute immediately
 
 ;-----------------------------------------------------------------------------
 ; StoreProgramLine - Store a numbered line in program memory
 ;-----------------------------------------------------------------------------
 StoreProgramLine:
-	PUSH	DE		; Save line number
-	PUSH	BC		; Save line length
-	RST	2		; Get first char of tokenized line
-	ORA	A		; Z set if line is empty (deleting line)
-	PUSH	PSW		; Save empty-line flag
-	CALL	FindProgramLine	; Find where line should go (BC=addr)
-	PUSH	BC		; Save line address
-	JNC	InsertLine	; Jump if line doesn't exist yet
+	push	de		; Save line number
+	push	bc		; Save line length
+	rst	2		; Get first char of tokenized line
+	ora	a		; Z set if line is empty (deleting line)
+	push	psw		; Save empty-line flag
+	call	FindProgramLine	; Find where line should go (BC=addr)
+	push	bc		; Save line address
+	jnc	InsertLine	; Jump if line doesn't exist yet
 
 ; Line exists - remove it first by moving rest of program down
 RemoveLine:
-	XCHG			; DE = next line address
-	LHLD	VAR_BASE	; HL = end of program
+	xchg			; DE = next line address
+	lhld	VAR_BASE	; HL = end of program
 RemoveLoop:
-	LDAX	DE		; Copy byte from DE to BC
-	STAX	BC
-	INX	BC
-	INX	DE
-	RST	4		; Compare HL and DE
-	JNZ	RemoveLoop	; Loop until DE reaches VAR_BASE
-	MOV	H,B		; Update VAR_BASE
-	MOV	L,C
-	SHLD	VAR_BASE
+	ldax	de		; Copy byte from DE to BC
+	stax	bc
+	inx	bc
+	inx	de
+	rst	4		; Compare HL and DE
+	jnz	RemoveLoop	; Loop until DE reaches VAR_BASE
+	mov	h,b		; Update VAR_BASE
+	mov	l,c
+	shld	VAR_BASE
 
 InsertLine:
-	POP	DE		; DE = line address
-	POP	PSW		; Restore empty-line flag
-	JZ	UpdateLinks	; If empty line, just update links
+	pop	de		; DE = line address
+	pop	psw		; Restore empty-line flag
+	jz	UpdateLinks	; If empty line, just update links
 	; Make room for new line
-	LHLD	VAR_BASE	; HL = end of program
-	XTHL			; HL = line length, stack = VAR_BASE
-	POP	BC		; BC = VAR_BASE
-	DAD	BC		; HL = new VAR_BASE
-	PUSH	HL
-	CALL	CopyMemoryUp	; Move program up to make room
-	POP	HL
-	SHLD	VAR_BASE	; Update VAR_BASE
-	XCHG			; HL = line address
-	MOV	M,H		; Store (temporary) next-line pointer
-	POP	DE		; DE = line number
-	INX	HL
-	INX	HL
-	MOV	M,E		; Store line number (low)
-	INX	HL
-	MOV	M,D		; Store line number (high)
-	INX	HL
+	lhld	VAR_BASE	; HL = end of program
+	xthl			; HL = line length, stack = VAR_BASE
+	pop	bc		; BC = VAR_BASE
+	dad	bc		; HL = new VAR_BASE
+	push	hl
+	call	CopyMemoryUp	; Move program up to make room
+	pop	hl
+	shld	VAR_BASE	; Update VAR_BASE
+	xchg			; HL = line address
+	mov	m,h		; Store (temporary) next-line pointer
+	pop	de		; DE = line number
+	inx	hl
+	inx	hl
+	mov	m,e		; Store line number (low)
+	inx	hl
+	mov	m,d		; Store line number (high)
+	inx	hl
 	; Copy tokenized line from buffer
-	LXI	DE,LINE_BUFFER
+	lxi	de,LINE_BUFFER
 CopyLine:
-	LDAX	DE		; Copy byte
-	MOV	M,A
-	INX	HL
-	INX	DE
-	ORA	A		; Check for null terminator
-	JNZ	CopyLine
+	ldax	de		; Copy byte
+	mov	m,a
+	inx	hl
+	inx	de
+	ora	a		; Check for null terminator
+	jnz	CopyLine
 
 ;-----------------------------------------------------------------------------
 ; UpdateLinks - Rebuild program line linked list
 ;-----------------------------------------------------------------------------
 UpdateLinks:
-	CALL	ClearVars	; Reset to start of program
-	INX	HL
-	XCHG
+	call	ClearVars	; Reset to start of program
+	inx	hl
+	xchg
 UpdateLinkLoop:
-	MOV	H,D		; HL = current line
-	MOV	L,E
-	MOV	A,M		; Check for end of program
-	INX	HL
-	ORA	M		; (next-line ptr is 0000)
-	JZ	GetNonBlankLine	; Done - go get next input
-	INX	HL		; Skip line number
-	INX	HL
-	INX	HL
-	XRA	A		; Find end of line (null byte)
+	mov	h,d		; HL = current line
+	mov	l,e
+	mov	a,m		; Check for end of program
+	inx	hl
+	ora	m		; (next-line ptr is 0000)
+	jz	GetNonBlankLine	; Done - go get next input
+	inx	hl		; Skip line number
+	inx	hl
+	inx	hl
+	xra	a		; Find end of line (null byte)
 FindLineEnd:
-	CMP	M
-	INX	HL
-	JNZ	FindLineEnd
-	XCHG			; DE = next line address
-	MOV	M,E		; Store next-line pointer
-	INX	HL
-	MOV	M,D
-	JMP	UpdateLinkLoop
+	cmp	m
+	inx	hl
+	jnz	FindLineEnd
+	xchg			; DE = next line address
+	mov	m,e		; Store next-line pointer
+	inx	hl
+	mov	m,d
+	jmp	UpdateLinkLoop
 ;=============================================================================
 ; FindProgramLine - Find Program Line by Number
 ; Input: DE = line number to find
@@ -515,87 +557,87 @@ FindLineEnd:
 ;         HL = address of next line (if line exists)
 ;=============================================================================
 FindProgramLine:
-	LHLD	PROGRAM_BASE	; Start at beginning of program
+	lhld	PROGRAM_BASE	; Start at beginning of program
 FindLineLoop:
-	MOV	B,H		; BC = current line address
-	MOV	C,L
-	MOV	A,M		; Check for end of program
-	INX	HL
-	ORA	M		; (next-line ptr is 0000)
-	DCX	HL
-	RZ			; Return if end of program (line not found)
-	PUSH	BC		; Save current line address
-	RST	6		; Push next-line address
-	RST	6		; Push line number
-	POP	HL		; HL = line number from program
-	RST	4		; Compare with DE (wanted line number)
-	POP	HL		; HL = next line address
-	POP	BC		; BC = current line address
-	CMC			; Complement carry
-	RZ			; Return if line numbers match (found)
-	CMC			; Restore carry
-	RNC			; Return if current > wanted (not found)
-	JMP	FindLineLoop	; Try next line
+	mov	b,h		; BC = current line address
+	mov	c,l
+	mov	a,m		; Check for end of program
+	inx	hl
+	ora	m		; (next-line ptr is 0000)
+	dcx	hl
+	rz			; Return if end of program (line not found)
+	push	bc		; Save current line address
+	rst	6		; Push next-line address
+	rst	6		; Push line number
+	pop	hl		; HL = line number from program
+	rst	4		; Compare with DE (wanted line number)
+	pop	hl		; HL = next line address
+	pop	bc		; BC = current line address
+	cmc			; Complement carry
+	rz			; Return if line numbers match (found)
+	cmc			; Restore carry
+	rnc			; Return if current > wanted (not found)
+	jmp	FindLineLoop	; Try next line
 
 ;=============================================================================
 ; New - NEW Command - Clear Program Memory
 ;=============================================================================
 New:
-	RNZ			; Syntax error if arguments
+	rnz			; Syntax error if arguments
 ; Fall through to Run for initialization
 Run:
-	LHLD	PROGRAM_BASE	; Get program base
-	XRA	A		; Write null terminator (empty program)
-	MOV	M,A
-	INX	HL
-	MOV	M,A
-	INX	HL
-	SHLD	VAR_BASE	; VAR_BASE = just after program
+	lhld	PROGRAM_BASE	; Get program base
+	xra	a		; Write null terminator (empty program)
+	mov	m,a
+	inx	hl
+	mov	m,a
+	inx	hl
+	shld	VAR_BASE	; VAR_BASE = just after program
 
 ;=============================================================================
 ; Clear - CLEAR/RUN Command - Reset Variables
 ;=============================================================================
 Clear:
-	RNZ			; Syntax error if arguments
+	rnz			; Syntax error if arguments
 ClearVars:
-	LHLD	PROGRAM_BASE	; Get program base
-	DCX	HL		; Point to byte before program
+	lhld	PROGRAM_BASE	; Get program base
+	dcx	hl		; Point to byte before program
 
 ;=============================================================================
 ; ResetAll - Reset All Variables and Pointers
 ;=============================================================================
 ResetAll:
-	SHLD	PROG_PTR_TEMP	; Save program pointer
-	CALL	Restore		; Reset DATA pointer
-	LHLD	VAR_BASE	; Reset variable pointers
-	SHLD	VAR_ARRAY_BASE	; No arrays yet
-	SHLD	VAR_TOP		; No variables yet
+	shld	PROG_PTR_TEMP	; Save program pointer
+	call	Restore		; Reset DATA pointer
+	lhld	VAR_BASE	; Reset variable pointers
+	shld	VAR_ARRAY_BASE	; No arrays yet
+	shld	VAR_TOP		; No variables yet
 
 ;=============================================================================
 ; ResetStack - Reset Stack Pointer
 ;=============================================================================
 ResetStack:
-	POP	BC		; Get return address
-	LHLD	STACK_TOP	; Get stack top
-	SPHL			; Reset stack pointer
-	XRA	A		; Push 0 on stack (stack marker)
-	MOV	L,A
-	PUSH	HL
-	PUSH	BC		; Put return address back
-	LHLD	PROG_PTR_TEMP	; Restore program pointer
-	RET
+	pop	bc		; Get return address
+	lhld	STACK_TOP	; Get stack top
+	sphl			; Reset stack pointer
+	xra	a		; Push 0 on stack (stack marker)
+	mov	l,a
+	push	hl
+	push	bc		; Put return address back
+	lhld	PROG_PTR_TEMP	; Restore program pointer
+	ret
 ;=============================================================================
 ; InputLineWithPrompt - Get Input with "? " Prompt
 ; Used by INPUT statement
 ;=============================================================================
 InputLineWithQ:
 InputLineWithPrompt:
-	MVI	A,'?'		; Print "? " prompt
-	RST	3
-	MVI	A,' '
-	RST	3
-	CALL	InputLine	; Get line of input
-	INX	HL		; Point past comma prefix
+	mvi	a,'?'		; Print "? " prompt
+	rst	3
+	mvi	a,' '
+	rst	3
+	call	InputLine	; Get line of input
+	inx	hl		; Point past comma prefix
 
 ;=============================================================================
 ; Tokenize - Convert Input Line to Tokenized Form
@@ -604,97 +646,97 @@ InputLineWithPrompt:
 ; Output: C = length of tokenized line + overhead, A = 0
 ;=============================================================================
 Tokenize:
-	MVI	C,5		; Initialize length (4 bytes header + 1)
-	LXI	DE,LINE_BUFFER	; Output pointer
+	mvi	c,5		; Initialize length (4 bytes header + 1)
+	lxi	de,LINE_BUFFER	; Output pointer
 TokenLoop:
-	MOV	A,M		; Get input character
-	CPI	' '		; Space?
-	JZ	WriteChar	; Just write spaces
-	MOV	B,A		; Save char in B
-	CPI	'"'		; Quote (string literal)?
-	JZ	FreeCopy	; Copy string without tokenizing
-	ORA	A		; Null terminator?
-	JZ	TokenExit	; Exit if end of input
+	mov	a,m		; Get input character
+	cpi	' '		; Space?
+	jz	WriteChar	; Just write spaces
+	mov	b,a		; Save char in B
+	cpi	'"'		; Quote (string literal)?
+	jz	FreeCopy	; Copy string without tokenizing
+	ora	a		; Null terminator?
+	jz	TokenExit	; Exit if end of input
 	; Try to match a keyword
-	PUSH	DE		; Save output pointer
-	LXI	DE,KEYWORDS-1	; Point to keyword table
-	PUSH	BC		; Save current char
-	MVI	B,7FH		; Initialize keyword ID counter
+	push	de		; Save output pointer
+	lxi	de,KEYWORDS-1	; Point to keyword table
+	push	bc		; Save current char
+	mvi	b,7FH		; Initialize keyword ID counter
 TryNextKeyword:
-	MOV	C,M		; Get input char (redundant but part of original)
-	MOV	C,M
-	XCHG			; HL = keyword ptr, DE = input ptr
+	mov	c,m		; Get input char (redundant but part of original)
+	mov	c,m
+	xchg			; HL = keyword ptr, DE = input ptr
 NextKeyword:
-	INX	HL		; Advance to next keyword char
-	ORA	M		; Check for end of keyword (bit 7 set)
-	JP	NextKeyword	; Loop if not end of keyword yet
+	inx	hl		; Advance to next keyword char
+	ora	m		; Check for end of keyword (bit 7 set)
+	jp	NextKeyword	; Loop if not end of keyword yet
 	; Found end of keyword - advance to next keyword
-	INR	B		; Increment keyword ID
-	MOV	A,M		; Get keyword char
-	ANI	7FH		; Mask off bit 7
-	JZ	NotKeyword+1	; If zero, end of keyword table (skip first XCHG)
-	CMP	C		; Compare to input char
-	JNZ	NextKeyword	; Try next keyword if no match
+	inr	b		; Increment keyword ID
+	mov	a,m		; Get keyword char
+	ani	7FH		; Mask off bit 7
+	jz	NotKeyword+1	; If zero, end of keyword table (skip first XCHG)
+	cmp	c		; Compare to input char
+	jnz	NextKeyword	; Try next keyword if no match
 	; First char matches - check rest of keyword
-	XCHG			; DE = keyword ptr, HL = input ptr
-	PUSH	HL		; Save input position
+	xchg			; DE = keyword ptr, HL = input ptr
+	push	hl		; Save input position
 KwCompare:
-	INX	DE		; Advance keyword ptr
-	LDAX	DE		; Get keyword char
-	ORA	A		; Check bit 7 (end of keyword)
-	JM	KwMatch		; Jump if matched entire keyword
-	MOV	C,A		; Save keyword char
-	RST	2		; Get next input char
-	CMP	C		; Compare
-	JZ	KwCompare	; Continue if match
-	POP	HL		; Restore input position
-	JMP	TryNextKeyword	; Try next keyword
+	inx	de		; Advance keyword ptr
+	ldax	de		; Get keyword char
+	ora	a		; Check bit 7 (end of keyword)
+	jm	KwMatch		; Jump if matched entire keyword
+	mov	c,a		; Save keyword char
+	rst	2		; Get next input char
+	cmp	c		; Compare
+	jz	KwCompare	; Continue if match
+	pop	hl		; Restore input position
+	jmp	TryNextKeyword	; Try next keyword
 
 KwMatch:
 	; Keyword matched - B has keyword ID (with bit 7 already set)
-	DB	048H		; MOV C,B - save keyword ID in C
+	db	048H		; MOV C,B - save keyword ID in C
 	; Fall through to cleanup code
 NotKeyword_cleanup:
-	POP	PSW		; Clean up stack (discard saved position)
+	pop	psw		; Clean up stack (discard saved position)
 NotKeyword:
 	; Entry point when keyword not found (jumps here skipping MOV C,B; POP PSW)
-	XCHG			; Restore pointers
-	XCHG
-	MOV	A,C		; A = character/keyword to output
-	POP	BC		; Restore saved BC
-	POP	DE		; Restore output pointer
+	xchg			; Restore pointers
+	xchg
+	mov	a,c		; A = character/keyword to output
+	pop	bc		; Restore saved BC
+	pop	de		; Restore output pointer
 WriteToken:
 WriteChar:
-	INX	HL		; Advance input pointer
-	STAX	DE		; Store character/token to output
-	INX	DE		; Advance output pointer
-	INR	C		; Increment length counter
+	inx	hl		; Advance input pointer
+	stax	de		; Store character/token to output
+	inx	de		; Advance output pointer
+	inr	c		; Increment length counter
 	; Check if we just wrote REM token
-	SUI	8EH		; REM token?
-	JNZ	TokenLoop	; No - continue tokenizing
-	MOV	B,A		; B = 0 (terminator for FreeCopy)
+	sui	8EH		; REM token?
+	jnz	TokenLoop	; No - continue tokenizing
+	mov	b,a		; B = 0 (terminator for FreeCopy)
 ; Free copy loop - copy without tokenizing (for strings and REM)
 FreeCopyLoop:
-	MOV	A,M		; Get character
-	ORA	A		; Null terminator?
-	JZ	TokenExit	; Exit if end
-	CMP	B		; Terminator character?
-	JZ	WriteChar	; If so, write it and resume tokenizing
+	mov	a,m		; Get character
+	ora	a		; Null terminator?
+	jz	TokenExit	; Exit if end
+	cmp	b		; Terminator character?
+	jz	WriteChar	; If so, write it and resume tokenizing
 FreeCopy:
-	INX	HL		; Advance input
-	STAX	DE		; Copy character
-	INR	C		; Increment length
-	INX	DE
-	JMP	FreeCopyLoop
+	inx	hl		; Advance input
+	stax	de		; Copy character
+	inr	c		; Increment length
+	inx	de
+	jmp	FreeCopyLoop
 
 TokenExit:
-	LXI	HL,COMMA_PREFIX	; Point to comma before LINE_BUFFER
-	STAX	DE		; Write three null terminators
-	INX	DE
-	STAX	DE
-	INX	DE
-	STAX	DE
-	RET
+	lxi	hl,COMMA_PREFIX	; Point to comma before LINE_BUFFER
+	stax	de		; Write three null terminators
+	inx	de
+	stax	de
+	inx	de
+	stax	de
+	ret
 
 ;=============================================================================
 ; InputLine - Get a Line of Input from Terminal
@@ -702,146 +744,146 @@ TokenExit:
 ; Output: HL = LINE_BUFFER
 ;=============================================================================
 Backspace:
-	DCR	B		; Decrement char count
-	DCX	HL		; Back up pointer
-	RST	3		; Echo backspace char
-	JNZ	InputNext	; Continue if not at start
+	dcr	b		; Decrement char count
+	dcx	hl		; Back up pointer
+	rst	3		; Echo backspace char
+	jnz	InputNext	; Continue if not at start
 LineCancel:
-	RST	3		; Echo cancel char
-	CALL	NewLine		; Print newline
+	rst	3		; Echo cancel char
+	call	NewLine		; Print newline
 InputLine:
-	LXI	HL,LINE_BUFFER	; Point to input buffer
-	MVI	B,1		; Initialize char count
+	lxi	hl,LINE_BUFFER	; Point to input buffer
+	mvi	b,1		; Initialize char count
 InputNext:
-	CALL	GetChar		; Get character from terminal
-	MOV	C,A		; Save in C
-	CPI	0DH		; Carriage return?
-	JZ	TerminateInput	; Done if CR
-	CPI	'@'		; Line cancel?
-	JZ	LineCancel
-	CPI	'_'		; Backspace?
-	JZ	Backspace
-	CPI	' '		; Control char?
-	JC	InputNext	; Ignore if < space
-	CPI	7DH		; DEL or higher?
-	JNC	InputNext	; Ignore if >= 7D
+	call	GetChar		; Get character from terminal
+	mov	c,a		; Save in C
+	cpi	0DH		; Carriage return?
+	jz	TerminateInput	; Done if CR
+	cpi	'@'		; Line cancel?
+	jz	LineCancel
+	cpi	'_'		; Backspace?
+	jz	Backspace
+	cpi	' '		; Control char?
+	jc	InputNext	; Ignore if < space
+	cpi	7DH		; DEL or higher?
+	jnc	InputNext	; Ignore if >= 7D
 	; Valid character - store it
-	MOV	A,B		; Check line length
-	CPI	72		; Buffer full?
-	MVI	A,07H		; Bell character
-	JNC	EchoChar	; Ring bell if full
-	MOV	A,C		; Get character back
-	MOV	M,C		; Store in buffer
-	INX	HL		; Advance pointer
-	INR	B		; Increment count
+	mov	a,b		; Check line length
+	cpi	72		; Buffer full?
+	mvi	a,07H		; Bell character
+	jnc	EchoChar	; Ring bell if full
+	mov	a,c		; Get character back
+	mov	m,c		; Store in buffer
+	inx	hl		; Advance pointer
+	inr	b		; Increment count
 EchoChar:
-	RST	3		; Echo character
-	JMP	InputNext	; Get next character
+	rst	3		; Echo character
+	jmp	InputNext	; Get next character
 
 ;=============================================================================
 ; I/O Routines (hardware-dependent, modified by Init)
 ;=============================================================================
 OutChar_tail:
-	CPI	72		; Check column position
-TERMINAL_WIDTH	EQU	OutChar_tail+1	; Terminal width operand (patched by Init)
-	CZ	NewLine		; Newline if at end
-	INR	A		; Increment column
-	STA	TERMINAL_X	; Save column
+	cpi	72		; Check column position
+TERMINAL_WIDTH	equ	OutChar_tail+1	; Terminal width operand (patched by Init)
+	cz	NewLine		; Newline if at end
+	inr	a		; Increment column
+	sta	TERMINAL_X	; Save column
 WaitTxReady:
-	IN	00H		; Check transmit ready (port 0 status)
-D0385	EQU	WaitTxReady+1	; Port number operand (patched by Init)
-	ANI	0C8H		; Mask ready bit
-D0387	EQU	WaitTxReady+3	; Mask operand (patched by Init)
-	JNZ	WaitTxReady	; Wait until ready
-	POP	PSW		; Restore character
-	OUT	01H		; Send character (port 1 data)
-D038D	EQU	WaitTxReady+9	; Port number operand (patched by Init)
-	PUSH	PSW		; Save again
-D038F	EQU	WaitTxReady+11	; IN opcode location (patched by Init)
-	IN	13H		; Check for paper tape mode
-	POP	PSW
-	RET
+	in	00H		; Check transmit ready (port 0 status)
+D0385	equ	WaitTxReady+1	; Port number operand (patched by Init)
+	ani	0C8H		; Mask ready bit
+D0387	equ	WaitTxReady+3	; Mask operand (patched by Init)
+	jnz	WaitTxReady	; Wait until ready
+	pop	psw		; Restore character
+	out	01H		; Send character (port 1 data)
+D038D	equ	WaitTxReady+9	; Port number operand (patched by Init)
+	push	psw		; Save again
+D038F	equ	WaitTxReady+11	; IN opcode location (patched by Init)
+	in	13H		; Check for paper tape mode
+	pop	psw
+	ret
 
 ;-----------------------------------------------------------------------------
 ; GetChar - Get Character from Terminal
 ;-----------------------------------------------------------------------------
 GetChar:
 GetChar_tail:                   ; Alias for code that calls GetChar_tail
-	IN	00H		; Check receive ready (port 0 status)
-	ANI	01H		; Mask ready bit
-	JNZ	GetChar		; Wait until ready
-	IN	01H		; Get character (port 1 data)
-	ANI	7FH		; Strip high bit
-	RET
+	in	00H		; Check receive ready (port 0 status)
+	ani	01H		; Mask ready bit
+	jnz	GetChar		; Wait until ready
+	in	01H		; Get character (port 1 data)
+	ani	7FH		; Strip high bit
+	ret
 ;=============================================================================
 ; LIST Handler
 ; Lists the program. As the stored program is in tokenised form (keywords are
 ; single-byte IDs), LIST decodes tokens back to keyword strings for display.
 ;=============================================================================
 List:
-	CALL	LineNumberFromStr	; Get line number argument into DE
-	RNZ			; Return if non-numeric argument
-	POP	BC		; Discard return address (we loop ourselves)
-	CALL	FindProgramLine	; Find starting line, BC=line addr
-	PUSH	BC		; Save line address
+	call	LineNumberFromStr	; Get line number argument into DE
+	rnz			; Return if non-numeric argument
+	pop	bc		; Discard return address (we loop ourselves)
+	call	FindProgramLine	; Find starting line, BC=line addr
+	push	bc		; Save line address
 ;-----------------------------------------------------------------------------
 ; ListNextLine - Loop through program lines
 ;-----------------------------------------------------------------------------
 ListNextLine:
-	POP	HL		; HL = current program line address
-	RST	6		; Push (HL), (HL+1) - next line pointer
-	POP	BC		; BC = next line address
-	MOV	A,B		; Check if next line is null (end of program)
-	ORA	C
-	JZ	Main		; Exit to Main if at end
-	CALL	TestBreakKey	; Allow user to break listing
-	PUSH	BC		; Save next line address
-	CALL	NewLine		; Print newline
-	RST	6		; Push line number
-	XTHL			; HL=line number, (SP)=prog ptr
-	CALL	PrintInt	; Print line number
-	MVI	A,' '		; Prepare to print space
-	POP	HL		; HL = program line content pointer
+	pop	hl		; HL = current program line address
+	rst	6		; Push (HL), (HL+1) - next line pointer
+	pop	bc		; BC = next line address
+	mov	a,b		; Check if next line is null (end of program)
+	ora	c
+	jz	Main		; Exit to Main if at end
+	call	TestBreakKey	; Allow user to break listing
+	push	bc		; Save next line address
+	call	NewLine		; Print newline
+	rst	6		; Push line number
+	xthl			; HL=line number, (SP)=prog ptr
+	call	PrintInt	; Print line number
+	mvi	a,' '		; Prepare to print space
+	pop	hl		; HL = program line content pointer
 ;-----------------------------------------------------------------------------
 ; ListChar - Print characters, expanding tokens to keywords
 ; This code uses overlapping instructions and must be exact bytes.
 ; The keyword expansion loop uses DE throughout (no PUSH/POP).
 ;-----------------------------------------------------------------------------
 ListChar:
-	RST	3		; DF - Print character in A
-	MOV	A,M		; 7E - Get next character
-	ORA	A		; B7 - Test for null (end of line)
-	INX	HL		; 23 - Advance pointer
-	JZ	ListNextLine	; CA xx xx - If null, go to next line
-	JP	ListChar	; F2 xx xx - If bit 7 clear, continue
+	rst	3		; DF - Print character in A
+	mov	a,m		; 7E - Get next character
+	ora	a		; B7 - Test for null (end of line)
+	inx	hl		; 23 - Advance pointer
+	jz	ListNextLine	; CA xx xx - If null, go to next line
+	jp	ListChar	; F2 xx xx - If bit 7 clear, continue
 	; Bit 7 set - keyword token handler (overlapping instruction trick)
-	DB	0D6H, 07FH	; SUI 7FH - Convert token to index
-	DB	04FH		; MOV C,A - Save count in C
-	DB	011H		; LXI DE,KEYWORDS
-	DB	LOW KEYWORDS
-	DB	HIGH KEYWORDS
+	db	0D6H, 07FH	; SUI 7FH - Convert token to index
+	db	04FH		; MOV C,A - Save count in C
+	db	011H		; LXI DE,KEYWORDS
+	db	low KEYWORDS
+	db	high KEYWORDS
 ToNextKeyword:
-	DB	01AH		; LDAX DE - Get keyword char
-	DB	013H		; INX DE - Advance
-	DB	0B7H		; ORA A - Test bit 7
-	DB	0F2H		; JP ToNextKeyword (self-ref)
-	DB	LOW ToNextKeyword
-	DB	HIGH ToNextKeyword
-	DB	00DH		; DCR C - Decrement counter
-	DB	0C2H		; JNZ ToNextKeyword (if not found)
-	DB	LOW ToNextKeyword
-	DB	HIGH ToNextKeyword
+	db	01AH		; LDAX DE - Get keyword char
+	db	013H		; INX DE - Advance
+	db	0B7H		; ORA A - Test bit 7
+	db	0F2H		; JP ToNextKeyword (self-ref)
+	db	low ToNextKeyword
+	db	high ToNextKeyword
+	db	00DH		; DCR C - Decrement counter
+	db	0C2H		; JNZ ToNextKeyword (if not found)
+	db	low ToNextKeyword
+	db	high ToNextKeyword
 PrintKeyword:
-	DB	0DFH		; RST 3 - Print char
-	DB	01AH		; LDAX DE - Get next keyword char
-	DB	013H		; INX DE - Advance
-	DB	0B7H		; ORA A - Test bit 7
-	DB	0F2H		; JP PrintKeyword (loop)
-	DB	LOW PrintKeyword
-	DB	HIGH PrintKeyword
-	DB	0C3H		; JMP ListChar+1 (back to main loop, skip RST 3)
-	DB	LOW (ListChar+1)
-	DB	HIGH (ListChar+1)
+	db	0DFH		; RST 3 - Print char
+	db	01AH		; LDAX DE - Get next keyword char
+	db	013H		; INX DE - Advance
+	db	0B7H		; ORA A - Test bit 7
+	db	0F2H		; JP PrintKeyword (loop)
+	db	low PrintKeyword
+	db	high PrintKeyword
+	db	0C3H		; JMP ListChar+1 (back to main loop, skip RST 3)
+	db	low (ListChar+1)
+	db	high (ListChar+1)
 ;=============================================================================
 ; FOR Handler
 ; Although FOR indicates the beginning of a loop, the handler only gets called
@@ -856,180 +898,180 @@ PrintKeyword:
 ;   - 2 bytes: program pointer after FOR statement
 ;=============================================================================
 For:
-	CALL	Let		; Assign initial value to loop variable
-	XTHL			; Swap prog ptr with return addr
-	CALL	GetFlowPtr	; Check for existing FOR with same var
-	POP	DE		; DE = program pointer
-	JNZ	ForNoReuse	; If no existing FOR, skip cleanup
-	DAD	BC		; HL = old SP + struct size (remove old struct)
-	SPHL			; Clean up old FOR structure
+	call	Let		; Assign initial value to loop variable
+	xthl			; Swap prog ptr with return addr
+	call	GetFlowPtr	; Check for existing FOR with same var
+	pop	de		; DE = program pointer
+	jnz	ForNoReuse	; If no existing FOR, skip cleanup
+	dad	bc		; HL = old SP + struct size (remove old struct)
+	sphl			; Clean up old FOR structure
 ForNoReuse:
-	XCHG			; HL = prog ptr, DE = stack ptr
-	MVI	C,08H		; Check for 8*4=32 bytes stack space
-	CALL	CheckEnoughVarSpace
-	PUSH	HL		; Save program pointer
-	CALL	FindNextStatement	; Find end of FOR statement
-	XTHL			; Swap: (SP)=stmt end, HL=prog ptr
-	PUSH	HL		; Push program pointer
-	LHLD	CURRENT_LINE	; Get current line number
-	XTHL			; Swap: (SP)=line number, HL=prog ptr
-	RST	1		; Syntax check for 'TO' token
-	DB	95H		; Token for TO
+	xchg			; HL = prog ptr, DE = stack ptr
+	mvi	c,08H		; Check for 8*4=32 bytes stack space
+	call	CheckEnoughVarSpace
+	push	hl		; Save program pointer
+	call	FindNextStatement	; Find end of FOR statement
+	xthl			; Swap: (SP)=stmt end, HL=prog ptr
+	push	hl		; Push program pointer
+	lhld	CURRENT_LINE	; Get current line number
+	xthl			; Swap: (SP)=line number, HL=prog ptr
+	rst	1		; Syntax check for 'TO' token
+	db	95H		; Token for TO
 ;-----------------------------------------------------------------------------
 ; Parse TO value and push onto stack
 ;-----------------------------------------------------------------------------
-	CALL	ArithParse	; Evaluate TO expression
-	PUSH	HL		; Save program pointer
-	CALL	FCopyToBCDE	; Get TO value into BCDE
-	POP	HL		; Restore program pointer
-	PUSH	BC		; Push TO value (high word)
-	PUSH	DE		; Push TO value (low word)
+	call	ArithParse	; Evaluate TO expression
+	push	hl		; Save program pointer
+	call	FCopyToBCDE	; Get TO value into BCDE
+	pop	hl		; Restore program pointer
+	push	bc		; Push TO value (high word)
+	push	de		; Push TO value (low word)
 	; Initialize STEP value to 1.0 (8100 0000 = 1.0)
-	LXI	BC,8100H	; B=81H (exponent), C=00
-	MOV	D,C		; D=00
-	MOV	E,D		; E=00
+	lxi	bc,8100H	; B=81H (exponent), C=00
+	mov	d,c		; D=00
+	mov	e,d		; E=00
 	; Check for optional STEP clause
-	MOV	A,M		; Get next token
-	CPI	97H		; Is it STEP token?
-	MVI	A,01H		; Default direction = forward
-	JNZ	PushStepValue	; If no STEP, use default 1.0
+	mov	a,m		; Get next token
+	cpi	97H		; Is it STEP token?
+	mvi	a,01H		; Default direction = forward
+	jnz	PushStepValue	; If no STEP, use default 1.0
 	; STEP clause present - evaluate it
-	CALL	ArithParse+1	; Skip token and evaluate STEP
-	PUSH	HL		; Save program pointer
-	CALL	FCopyToBCDE	; Get STEP value into BCDE
-	RST	5		; Test sign of STEP (sets A to direction)
-	POP	HL		; Restore program pointer
+	call	ArithParse+1	; Skip token and evaluate STEP
+	push	hl		; Save program pointer
+	call	FCopyToBCDE	; Get STEP value into BCDE
+	rst	5		; Test sign of STEP (sets A to direction)
+	pop	hl		; Restore program pointer
 PushStepValue:
-	PUSH	BC		; Push STEP value (high word)
-	PUSH	DE		; Push STEP value (low word)
-	PUSH	PSW		; Push direction byte (1 or -1)
-	INX	SP		; Adjust SP (only push 1 byte)
-	PUSH	HL		; Push program pointer
-	LHLD	PROG_PTR_TEMP	; Get loop variable address
-	XTHL			; Swap: (SP)=var addr, HL=prog ptr
+	push	bc		; Push STEP value (high word)
+	push	de		; Push STEP value (low word)
+	push	psw		; Push direction byte (1 or -1)
+	inx	sp		; Adjust SP (only push 1 byte)
+	push	hl		; Push program pointer
+	lhld	PROG_PTR_TEMP	; Get loop variable address
+	xthl			; Swap: (SP)=var addr, HL=prog ptr
 ;-----------------------------------------------------------------------------
 ; EndOfForHandler - Push FOR token and fall into ExecNext
 ; This is the entry point for NEXT to re-enter a FOR loop
 ;-----------------------------------------------------------------------------
 EndOfForHandler:
-	MVI	B,81H		; FOR token ID
-	PUSH	BC		; Push token byte
-	INX	SP		; Adjust SP (only push 1 byte)
+	mvi	b,81H		; FOR token ID
+	push	bc		; Push token byte
+	inx	sp		; Adjust SP (only push 1 byte)
 ;=============================================================================
 ; ExecNext - Execute next statement
 ; Having executed one statement, moves to the next statement on the line
 ; or to the next line if there are no more statements.
 ;=============================================================================
 ExecNext:
-	CALL	TestBreakKey	; Give user chance to break execution
-	MOV	A,M		; Get current character
-	CPI	':'		; Is it statement separator?
-	JZ	Exec		; If colon, execute next statement
-	ORA	A		; Is it null (end of line)?
-	JNZ	SyntaxError	; If not null or colon, syntax error
+	call	TestBreakKey	; Give user chance to break execution
+	mov	a,m		; Get current character
+	cpi	':'		; Is it statement separator?
+	jz	Exec		; If colon, execute next statement
+	ora	a		; Is it null (end of line)?
+	jnz	SyntaxError	; If not null or colon, syntax error
 	; End of line - move to next line
-	INX	HL		; Skip null terminator
-	MOV	A,M		; Get low byte of next line address
-	INX	HL
-	ORA	M		; OR with high byte
-	JZ	StopCont	; If both zero, end of program
+	inx	hl		; Skip null terminator
+	mov	a,m		; Get low byte of next line address
+	inx	hl
+	ora	m		; OR with high byte
+	jz	StopCont	; If both zero, end of program
 	; More program lines exist
-	INX	HL		; Point to line number
-	MOV	E,M		; Get line number low byte
-	INX	HL
-	MOV	D,M		; Get line number high byte
-	XCHG			; HL = line number
-	SHLD	CURRENT_LINE	; Store current line number
-	XCHG			; HL = program pointer
+	inx	hl		; Point to line number
+	mov	e,m		; Get line number low byte
+	inx	hl
+	mov	d,m		; Get line number high byte
+	xchg			; HL = line number
+	shld	CURRENT_LINE	; Store current line number
+	xchg			; HL = program pointer
 ;-----------------------------------------------------------------------------
 ; Exec - Execute a statement of BASIC code pointed to by HL
 ;-----------------------------------------------------------------------------
 Exec:
-	RST	2		; Get first character of statement
-	LXI	DE,ExecNext	; Return address after statement
-	PUSH	DE		; Push return address
+	rst	2		; Get first character of statement
+	lxi	de,ExecNext	; Return address after statement
+	push	de		; Push return address
 ExecStatement:
-	RZ			; Return if empty statement
-	SUI	80H		; Subtract keyword base
-	JC	Let		; If < 80H, implicit LET statement
-	CPI	14H		; Is it a general keyword (0-19)?
-	JNC	SyntaxError	; If >= 20, syntax error
+	rz			; Return if empty statement
+	sui	80H		; Subtract keyword base
+	jc	Let		; If < 80H, implicit LET statement
+	cpi	14H		; Is it a general keyword (0-19)?
+	jnc	SyntaxError	; If >= 20, syntax error
 	; Look up keyword handler in function table
-	RLC			; Multiply by 2 (word table)
-	MOV	C,A		; BC = offset into table
-	MVI	B,00H
-	XCHG			; DE = program pointer
-	LXI	HL,KW_GENERAL_FNS	; HL = function table
-	DAD	BC		; HL = pointer to function address
-	MOV	C,M		; Get function address low byte
-	INX	HL
-	MOV	B,M		; Get function address high byte
-	PUSH	BC		; Push function address
-	XCHG			; HL = program pointer
-	RST	2		; Get next character
-	RET			; Jump to keyword handler
+	rlc			; Multiply by 2 (word table)
+	mov	c,a		; BC = offset into table
+	mvi	b,00H
+	xchg			; DE = program pointer
+	lxi	hl,KW_GENERAL_FNS	; HL = function table
+	dad	bc		; HL = pointer to function address
+	mov	c,m		; Get function address low byte
+	inx	hl
+	mov	b,m		; Get function address high byte
+	push	bc		; Push function address
+	xchg			; HL = program pointer
+	rst	2		; Get next character
+	ret			; Jump to keyword handler
 ;-----------------------------------------------------------------------------
 ; NextChar_tail - Continuation of RST 2 (NextChar)
 ; Skips spaces, sets carry if char >= '0', sets Z if char is null
 ;-----------------------------------------------------------------------------
 NextChar_tail:
-	CPI	' '		; Is it a space?
-	JZ	NextChar	; If space, get next char
-	CPI	'0'		; Compare to '0'
-	CMC			; Complement carry (C set if digit)
-	INR	A		; Set Z flag if A was 0
-	DCR	A		; (without changing A)
-	RET
+	cpi	' '		; Is it a space?
+	jz	NextChar	; If space, get next char
+	cpi	'0'		; Compare to '0'
+	cmc			; Complement carry (C set if digit)
+	inr	a		; Set Z flag if A was 0
+	dcr	a		; (without changing A)
+	ret
 ;-----------------------------------------------------------------------------
 ; RESTORE Handler
 ; Resets the DATA pointer to just before the start of the program
 ;-----------------------------------------------------------------------------
 Restore:
-	XCHG			; Save HL in DE
-	LHLD	PROGRAM_BASE	; Get start of program
-	DCX	HL		; Point to byte before program
+	xchg			; Save HL in DE
+	lhld	PROGRAM_BASE	; Get start of program
+	dcx	hl		; Point to byte before program
 SaveDataPtr:
-	SHLD	DATA_PROG_PTR	; Store as DATA pointer
-	XCHG			; Restore HL
-	RET
+	shld	DATA_PROG_PTR	; Store as DATA pointer
+	xchg			; Restore HL
+	ret
 ;-----------------------------------------------------------------------------
 ; TestBreakKey - Check if user pressed Ctrl-C to break
 ; Returns if no key or non-break key, jumps to Stop if Ctrl-C
 ;-----------------------------------------------------------------------------
 TestBreakKey:
-	IN	00H		; Check if key pressed
-	ANI	01H		; Mask ready bit
-	RNZ			; Return if no key
-	CALL	GetChar_tail	; Get the character
-	CPI	03H		; Is it Ctrl-C (break)?
-	JZ	Stop		; If so, stop program
+	in	00H		; Check if key pressed
+	ani	01H		; Mask ready bit
+	rnz			; Return if no key
+	call	GetChar_tail	; Get the character
+	cpi	03H		; Is it Ctrl-C (break)?
+	jz	Stop		; If so, stop program
 	; Fall through to CharIsAlpha (which returns to caller)
 ;-----------------------------------------------------------------------------
 ; CharIsAlpha - Check if character at (HL) is alphabetic
 ; Returns: Carry clear if A-Z, Carry set otherwise
 ;-----------------------------------------------------------------------------
 CharIsAlpha:
-	MOV	A,M		; Get character
-	CPI	'A'		; Compare to 'A'
-	RC			; Return with carry if < 'A'
-	CPI	'Z'+1		; Compare to 'Z'+1
-	CMC			; Complement carry
-	RET
+	mov	a,m		; Get character
+	cpi	'A'		; Compare to 'A'
+	rc			; Return with carry if < 'A'
+	cpi	'Z'+1		; Compare to 'Z'+1
+	cmc			; Complement carry
+	ret
 ;-----------------------------------------------------------------------------
 ; GetSubscript - Get array subscript as positive integer
 ; Evaluates expression and returns integer value in CDE
 ;-----------------------------------------------------------------------------
 GetSubscript:
-	RST	2		; Get next character
-	CALL	ArithParse	; Evaluate expression
-	RST	5		; Test sign of result
-	JM	FunctionCallError	; Error if negative
-	LDA	FACCUM+3	; Get exponent
-	CPI	90H		; Check if > 32767
-	JC	FCompare	; Convert to integer if valid
+	rst	2		; Get next character
+	call	ArithParse	; Evaluate expression
+	rst	5		; Test sign of result
+	jm	FunctionCallError	; Error if negative
+	lda	FACCUM+3	; Get exponent
+	cpi	90H		; Check if > 32767
+	jc	FCompare	; Convert to integer if valid
 FunctionCallError:
-	MVI	E,08H		; FC - Function Call error
-	JMP	Error
+	mvi	e,08H		; FC - Function Call error
+	jmp	Error
 ;=============================================================================
 ; LineNumberFromStr - Parse line number from string
 ; Input: HL = string pointer
@@ -1038,81 +1080,81 @@ FunctionCallError:
 ; Maximum line number is 65529 (errors if > 6552 before last digit)
 ;=============================================================================
 LineNumberFromStr:
-	DCX	HL		; Back up to get char before current
-	LXI	DE,0		; Initialize result to 0
+	dcx	hl		; Back up to get char before current
+	lxi	de,0		; Initialize result to 0
 NextLineNumChar:
-	RST	2		; Get next non-space character
-	RNC			; Return if not a digit (NC means < '0')
-	PUSH	HL		; Save string pointer
-	PUSH	PSW		; Save digit character
-	LXI	HL,6552		; Check if result > 6552
-	RST	4		; Compare HL to DE
-	JC	SyntaxError	; Error if > 6552 (result would be > 65529)
+	rst	2		; Get next non-space character
+	rnc			; Return if not a digit (NC means < '0')
+	push	hl		; Save string pointer
+	push	psw		; Save digit character
+	lxi	hl,6552		; Check if result > 6552
+	rst	4		; Compare HL to DE
+	jc	SyntaxError	; Error if > 6552 (result would be > 65529)
 	; Multiply current result by 10: DE = DE*10
-	MOV	H,D		; HL = DE
-	MOV	L,E
-	DAD	DE		; HL = DE*2
-	DAD	HL		; HL = DE*4
-	DAD	DE		; HL = DE*5
-	DAD	HL		; HL = DE*10
+	mov	h,d		; HL = DE
+	mov	l,e
+	dad	de		; HL = DE*2
+	dad	hl		; HL = DE*4
+	dad	de		; HL = DE*5
+	dad	hl		; HL = DE*10
 	; Add new digit
-	POP	PSW		; Restore digit character
-	SUI	'0'		; Convert ASCII to value
-	MOV	E,A		; DE = digit value
-	MVI	D,00H
-	DAD	DE		; HL = result*10 + digit
-	XCHG			; DE = new result
-	POP	HL		; Restore string pointer
-	JMP	NextLineNumChar	; Continue parsing
+	pop	psw		; Restore digit character
+	sui	'0'		; Convert ASCII to value
+	mov	e,a		; DE = digit value
+	mvi	d,00H
+	dad	de		; HL = result*10 + digit
+	xchg			; DE = new result
+	pop	hl		; Restore string pointer
+	jmp	NextLineNumChar	; Continue parsing
 ;=============================================================================
 ; GOSUB Handler
 ; Sets up a flow control structure on stack and falls into GOTO.
 ; Stack structure: KWID_GOSUB (8CH), line number (2), prog ptr (2)
 ;=============================================================================
 Gosub:
-	MVI	C,03H		; Need 3 words (6 bytes) stack space
-	CALL	CheckEnoughVarSpace
-	POP	BC		; Preserve return address
-	PUSH	HL		; Push program pointer
-	PUSH	HL		; Push again (will become line number)
-	LHLD	CURRENT_LINE	; Get current line number
-	XTHL			; Swap with stacked prog ptr
-	MVI	A,8CH		; KWID_GOSUB token
-	PUSH	PSW		; Push token (high byte)
-	INX	SP		; Adjust SP (only pushed 1 byte)
-	PUSH	BC		; Push return address
+	mvi	c,03H		; Need 3 words (6 bytes) stack space
+	call	CheckEnoughVarSpace
+	pop	bc		; Preserve return address
+	push	hl		; Push program pointer
+	push	hl		; Push again (will become line number)
+	lhld	CURRENT_LINE	; Get current line number
+	xthl			; Swap with stacked prog ptr
+	mvi	a,8CH		; KWID_GOSUB token
+	push	psw		; Push token (high byte)
+	inx	sp		; Adjust SP (only pushed 1 byte)
+	push	bc		; Push return address
 	; Fall through to GOTO
 ;=============================================================================
 ; GOTO Handler
 ; Sets program execution to continue from the line number argument.
 ;=============================================================================
 Goto:
-	CALL	LineNumberFromStr	; Get target line number in DE
-	RNZ			; Return (error) if no line number
-	CALL	FindProgramLine	; Find the line, BC = address
-	MOV	H,B		; HL = line address
-	MOV	L,C
-	DCX	HL		; Adjust (FindProgramLine returns +1)
-	RC			; Return if line found (carry set)
-	MVI	E,0EH		; UL - Undefined Line error
-	JMP	Error
+	call	LineNumberFromStr	; Get target line number in DE
+	rnz			; Return (error) if no line number
+	call	FindProgramLine	; Find the line, BC = address
+	mov	h,b		; HL = line address
+	mov	l,c
+	dcx	hl		; Adjust (FindProgramLine returns +1)
+	rc			; Return if line found (carry set)
+	mvi	e,0EH		; UL - Undefined Line error
+	jmp	Error
 ;=============================================================================
 ; RETURN Handler
 ; Returns program execution to statement after the last GOSUB.
 ; Information about where to return is kept in flow struct on stack.
 ;=============================================================================
 Return:
-	RNZ			; No arguments allowed
-	MVI	D,0FFH		; Search for any flow struct (not FOR)
-	CALL	GetFlowPtr	; Find flow structure on stack
-	SPHL			; Set SP to flow structure
-	CPI	8CH		; Is it KWID_GOSUB?
-	MVI	E,04H		; RG - Return without Gosub error
-	JNZ	Error		; Error if not GOSUB
-	POP	HL		; Get saved line number
-	SHLD	CURRENT_LINE	; Restore current line
-	LXI	HL,ExecNext	; Set return to ExecNext
-	XTHL			; Swap with prog ptr, HL = prog ptr
+	rnz			; No arguments allowed
+	mvi	d,0FFH		; Search for any flow struct (not FOR)
+	call	GetFlowPtr	; Find flow structure on stack
+	sphl			; Set SP to flow structure
+	cpi	8CH		; Is it KWID_GOSUB?
+	mvi	e,04H		; RG - Return without Gosub error
+	jnz	Error		; Error if not GOSUB
+	pop	hl		; Get saved line number
+	shld	CURRENT_LINE	; Restore current line
+	lxi	hl,ExecNext	; Set return to ExecNext
+	xthl			; Swap with prog ptr, HL = prog ptr
 	; Fall through to FindNextStatement
 ;=============================================================================
 ; FindNextStatement - Find end of statement or end of line
@@ -1120,44 +1162,44 @@ Return:
 ; Scans forward until null or C character found
 ;=============================================================================
 FindNextStatement:
-	DB	01H		; LXI B opcode - skip next 2 bytes
-	DB	':'		; Statement separator (skipped)
+	db	01H		; LXI B opcode - skip next 2 bytes
+	db	':'		; Statement separator (skipped)
 ;-----------------------------------------------------------------------------
 ; REM Handler - Entry point when REM keyword encountered
 ; Uses MVI C,00 to scan for null only (skip rest of line)
 ;-----------------------------------------------------------------------------
 Rem:
-	MVI	C,00H		; Scan for null terminator only
+	mvi	c,00H		; Scan for null terminator only
 FindStmtLoop:
-	MOV	A,M		; Get character
-	ORA	A		; Is it null?
-	RZ			; Return if end of line
-	CMP	C		; Is it the target character?
-	RZ			; Return if found
-	INX	HL		; Advance pointer
-	JMP	FindStmtLoop	; Keep scanning
+	mov	a,m		; Get character
+	ora	a		; Is it null?
+	rz			; Return if end of line
+	cmp	c		; Is it the target character?
+	rz			; Return if found
+	inx	hl		; Advance pointer
+	jmp	FindStmtLoop	; Keep scanning
 ;=============================================================================
 ; LET Handler
 ; Assigns a value to a variable. LET A=5 or just A=5 (implicit LET)
 ;=============================================================================
 Let:
-	CALL	GetVar		; Get variable address in DE
-	RST	1		; Syntax check for '='
-	DB	9DH		; Token for '='
+	call	GetVar		; Get variable address in DE
+	rst	1		; Syntax check for '='
+	db	9DH		; Token for '='
 ;-----------------------------------------------------------------------------
 ; AssignVar - Assign expression result to variable at DE
 ; Input: DE = variable address, HL = expression to evaluate
 ;-----------------------------------------------------------------------------
 AssignVar:
-	PUSH	DE		; Save variable address
-	CALL	ArithParse	; Evaluate expression into FACCUM
-	XTHL			; HL = var addr, (SP) = prog ptr
-	SHLD	PROG_PTR_TEMP	; Save var addr (for FOR loop detection)
-	PUSH	HL		; Save var address
-	CALL	FCopyToMem	; Copy FACCUM to variable
-	POP	DE		; DE = var address
-	POP	HL		; HL = program pointer
-	RET
+	push	de		; Save variable address
+	call	ArithParse	; Evaluate expression into FACCUM
+	xthl			; HL = var addr, (SP) = prog ptr
+	shld	PROG_PTR_TEMP	; Save var addr (for FOR loop detection)
+	push	hl		; Save var address
+	call	FCopyToMem	; Copy FACCUM to variable
+	pop	de		; DE = var address
+	pop	hl		; HL = program pointer
+	ret
 ;=============================================================================
 ; IF Handler
 ; Evaluates a condition (lhs <op> rhs) where <op> is >, =, <, or combination
@@ -1166,246 +1208,246 @@ AssignVar:
 ; So <= and =< both equal 6, >= and => equal 3, <> equals 5
 ;=============================================================================
 If:
-	CALL	ArithParse	; Evaluate left-hand side expression
-	MOV	A,M		; Get first char of comparison operator
-	CALL	FPush		; Push LHS value onto stack
-	MVI	D,00H		; D = comparison operator bitmask
+	call	ArithParse	; Evaluate left-hand side expression
+	mov	a,m		; Get first char of comparison operator
+	call	FPush		; Push LHS value onto stack
+	mvi	d,00H		; D = comparison operator bitmask
 GetCompareOpLoop:
-	SUI	9CH		; Subtract KWID_> (9C=>, 9D==, 9E=<)
-	JC	GotCompareOp	; Exit loop if not a comparison token
-	CPI	03H		; Check if it's one of the 3 comp ops
-	JNC	GotCompareOp	; Exit if not
+	sui	9CH		; Subtract KWID_> (9C=>, 9D==, 9E=<)
+	jc	GotCompareOp	; Exit loop if not a comparison token
+	cpi	03H		; Check if it's one of the 3 comp ops
+	jnc	GotCompareOp	; Exit if not
 	; Set the appropriate bit in D
-	CPI	01H		; Compare to '=' offset
-	RAL			; Rotate carry into bit 0
-	ORA	D		; OR with existing bits
-	MOV	D,A		; Save updated bitmask
-	RST	2		; Get next character
-	JMP	GetCompareOpLoop
+	cpi	01H		; Compare to '=' offset
+	ral			; Rotate carry into bit 0
+	ora	d		; OR with existing bits
+	mov	d,a		; Save updated bitmask
+	rst	2		; Get next character
+	jmp	GetCompareOpLoop
 GotCompareOp:
-	MOV	A,D		; Get comparison bitmask
-	ORA	A		; Any comparison operators?
-	JZ	SyntaxError	; Error if no comparison operator
-	PUSH	PSW		; Save comparison bitmask
-	CALL	ArithParse	; Evaluate right-hand side
-	RST	1		; Syntax check for THEN
-	DB	96H		; Token for THEN
-	DCX	HL		; Back up pointer
-	POP	PSW		; Restore comparison bitmask
-	POP	BC		; Pop LHS high word
-	POP	DE		; Pop LHS low word
-	PUSH	HL		; Save program pointer
-	PUSH	PSW		; Save comparison bitmask
-	CALL	FCompareWithBCDE ; Compare LHS to RHS (result in A)
+	mov	a,d		; Get comparison bitmask
+	ora	a		; Any comparison operators?
+	jz	SyntaxError	; Error if no comparison operator
+	push	psw		; Save comparison bitmask
+	call	ArithParse	; Evaluate right-hand side
+	rst	1		; Syntax check for THEN
+	db	96H		; Token for THEN
+	dcx	hl		; Back up pointer
+	pop	psw		; Restore comparison bitmask
+	pop	bc		; Pop LHS high word
+	pop	de		; Pop LHS low word
+	push	hl		; Save program pointer
+	push	psw		; Save comparison bitmask
+	call	FCompareWithBCDE ; Compare LHS to RHS (result in A)
 	; Convert FCompare result (-1,0,1) to bit pattern and test
-	INR	A		; -1->0, 0->1, 1->2
-	RAL			; 0->0, 1->2, 2->4 (bits 0,1,2)
-	POP	BC		; B = comparison bitmask
-	ANA	B		; Test if result matches required comparison
-	POP	HL		; Restore program pointer
-	JZ	Rem		; If false, skip rest of line (like REM)
+	inr	a		; -1->0, 0->1, 1->2
+	ral			; 0->0, 1->2, 2->4 (bits 0,1,2)
+	pop	bc		; B = comparison bitmask
+	ana	b		; Test if result matches required comparison
+	pop	hl		; Restore program pointer
+	jz	Rem		; If false, skip rest of line (like REM)
 	; Condition is true - execute THEN clause
-	RST	2		; Get first char after THEN
-	JC	Goto		; If digit, implicit GOTO
-	JMP	ExecStatement	; Otherwise execute statement
+	rst	2		; Get first char after THEN
+	jc	Goto		; If digit, implicit GOTO
+	jmp	ExecStatement	; Otherwise execute statement
 ;-----------------------------------------------------------------------------
 ; PrintLoop re-entry point (backs up and gets next char)
 ;-----------------------------------------------------------------------------
 PrintLoopEntry:
-	DCX	HL		; Back up pointer
-	RST	2		; Get next character
+	dcx	hl		; Back up pointer
+	rst	2		; Get next character
 ;=============================================================================
 ; PRINT Handler
 ; Prints expressions, string literals, with optional formatting (TAB, comma, ;)
 ;=============================================================================
 Print:
-	JZ	NewLine		; If end of line, just print newline
+	jz	NewLine		; If end of line, just print newline
 PrintLoop:
-	RZ			; Return if end of statement
-	CPI	'"'		; String literal?
-	CZ	PrintString	; Print string if so
-	JZ	PrintLoopEntry	; Loop back for more
-	CPI	94H		; TAB( keyword?
-	JZ	Tab		; Handle TAB function
-	PUSH	HL		; Save program pointer
-	CPI	','		; Comma (tab to next zone)?
-	JZ	ToNextTabBreak	; Handle comma
-	CPI	';'		; Semicolon (no spacing)?
-	JZ	ExitTab		; Just continue (no spacing)
+	rz			; Return if end of statement
+	cpi	'"'		; String literal?
+	cz	PrintString	; Print string if so
+	jz	PrintLoopEntry	; Loop back for more
+	cpi	94H		; TAB( keyword?
+	jz	Tab		; Handle TAB function
+	push	hl		; Save program pointer
+	cpi	','		; Comma (tab to next zone)?
+	jz	ToNextTabBreak	; Handle comma
+	cpi	';'		; Semicolon (no spacing)?
+	jz	ExitTab		; Just continue (no spacing)
 	; Must be an expression to print
-	POP	BC		; Discard saved pointer
-	CALL	ArithParse	; Evaluate expression
-	PUSH	HL		; Save program pointer
-	CALL	FOut		; Convert FACCUM to string
-	CALL	PrintStringLoop	; Print the string
-	MVI	A,' '		; Print trailing space
-	RST	3
-	POP	HL		; Restore program pointer
-	JMP	PrintLoopEntry	; Continue with more print items
+	pop	bc		; Discard saved pointer
+	call	ArithParse	; Evaluate expression
+	push	hl		; Save program pointer
+	call	FOut		; Convert FACCUM to string
+	call	PrintStringLoop	; Print the string
+	mvi	a,' '		; Print trailing space
+	rst	3
+	pop	hl		; Restore program pointer
+	jmp	PrintLoopEntry	; Continue with more print items
 ;-----------------------------------------------------------------------------
 ; TerminateInput - End input line with null and reset pointer
 ;-----------------------------------------------------------------------------
 TerminateInput:
-	MVI	M,00H		; Write null terminator
-	LXI	HL,COMMA_PREFIX	; Point to comma before LINE_BUFFER
+	mvi	m,00H		; Write null terminator
+	lxi	hl,COMMA_PREFIX	; Point to comma before LINE_BUFFER
 ;-----------------------------------------------------------------------------
 ; NewLine - Print CR/LF plus trailing nulls for teletype timing
 ;-----------------------------------------------------------------------------
 NewLine:
-	MVI	A,0DH		; Carriage return
-	STA	TERMINAL_X	; Reset column counter
-	RST	3		; Print CR
-	MVI	A,0AH		; Line feed
-	RST	3		; Print LF
-	LDA	TERMINAL_Y	; Get null count for timing
+	mvi	a,0DH		; Carriage return
+	sta	TERMINAL_X	; Reset column counter
+	rst	3		; Print CR
+	mvi	a,0AH		; Line feed
+	rst	3		; Print LF
+	lda	TERMINAL_Y	; Get null count for timing
 PrintNullLoop:
-	DCR	A		; Decrement counter
-	STA	TERMINAL_X	; Store as column position
-	RZ			; Return when done
-	PUSH	PSW		; Save counter
-	XRA	A		; A = 0 (null character)
-	RST	3		; Print null
-	POP	PSW		; Restore counter
-	JMP	PrintNullLoop	; Loop
+	dcr	a		; Decrement counter
+	sta	TERMINAL_X	; Store as column position
+	rz			; Return when done
+	push	psw		; Save counter
+	xra	a		; A = 0 (null character)
+	rst	3		; Print null
+	pop	psw		; Restore counter
+	jmp	PrintNullLoop	; Loop
 ;-----------------------------------------------------------------------------
 ; PrintString - Print string literal (stops at null or closing quote)
 ;-----------------------------------------------------------------------------
 PrintString:
-	INX	HL		; Skip opening quote
+	inx	hl		; Skip opening quote
 PrintStringLoop:
-	MOV	A,M		; Get character
-	ORA	A		; Null terminator?
-	RZ			; Return if end
-	INX	HL		; Advance pointer
-	CPI	'"'		; Closing quote?
-	RZ			; Return if end of string
-	RST	3		; Print character
-	CPI	0DH		; Carriage return?
-	CZ	NewLine		; If CR, do full newline
-	JMP	PrintStringLoop	; Continue
+	mov	a,m		; Get character
+	ora	a		; Null terminator?
+	rz			; Return if end
+	inx	hl		; Advance pointer
+	cpi	'"'		; Closing quote?
+	rz			; Return if end of string
+	rst	3		; Print character
+	cpi	0DH		; Carriage return?
+	cz	NewLine		; If CR, do full newline
+	jmp	PrintStringLoop	; Continue
 ;-----------------------------------------------------------------------------
 ; ToNextTabBreak - Move to next 14-column tab zone (comma handler)
 ;-----------------------------------------------------------------------------
 ToNextTabBreak:
-	LDA	TERMINAL_X	; Get current column
-	CPI	56		; Past last tab zone?
-	CNC	NewLine		; If so, go to new line
-	JNC	ExitTab		; And continue
+	lda	TERMINAL_X	; Get current column
+	cpi	56		; Past last tab zone?
+	cnc	NewLine		; If so, go to new line
+	jnc	ExitTab		; And continue
 CalcSpaceCount:
-	SUI	14		; Subtract zone width
-	JNC	CalcSpaceCount	; Loop until negative
-	CMA			; A = spaces to next zone - 1
-	JMP	PrintSpaceLoop	; Print the spaces
+	sui	14		; Subtract zone width
+	jnc	CalcSpaceCount	; Loop until negative
+	cma			; A = spaces to next zone - 1
+	jmp	PrintSpaceLoop	; Print the spaces
 ;-----------------------------------------------------------------------------
 ; TAB Handler - Tab to absolute column position
 ; TAB(n) moves to column n
 ;-----------------------------------------------------------------------------
 Tab:
-	CALL	GetSubscript	; Get column number in E
-	RST	1		; Syntax check for ')'
-	DB	')'
+	call	GetSubscript	; Get column number in E
+	rst	1		; Syntax check for ')'
+	db	')'
 PrintSpaces:
-	DCX	HL		; Back up pointer
-	PUSH	HL		; Save program pointer
-	LDA	TERMINAL_X	; Get current column
-	CMA			; Negate
-	ADD	E		; Add target column
-	JNC	ExitTab		; If already past target, skip
+	dcx	hl		; Back up pointer
+	push	hl		; Save program pointer
+	lda	TERMINAL_X	; Get current column
+	cma			; Negate
+	add	e		; Add target column
+	jnc	ExitTab		; If already past target, skip
 PrintSpaceLoop:
-	INR	A		; A = number of spaces to print
-	MOV	B,A		; B = counter
-	MVI	A,' '		; Space character
+	inr	a		; A = number of spaces to print
+	mov	b,a		; B = counter
+	mvi	a,' '		; Space character
 PrintSpaceInner:
-	RST	3		; Print space
-	DCR	B		; Decrement counter
-	JNZ	PrintSpaceInner	; Loop until done
+	rst	3		; Print space
+	dcr	b		; Decrement counter
+	jnz	PrintSpaceInner	; Loop until done
 ExitTab:
-	POP	HL		; Restore program pointer
-	RST	2		; Get next character
-	JMP	PrintLoop	; Continue printing
+	pop	hl		; Restore program pointer
+	rst	2		; Get next character
+	jmp	PrintLoop	; Continue printing
 ;=============================================================================
 ; INPUT Handler
 ; Lets user input values at a '?' prompt. INPUT only works in program mode.
 ;=============================================================================
 Input:
-	PUSH	HL		; Save program pointer
-	LHLD	CURRENT_LINE	; Get current line number
-	MVI	E,16H		; ID - Illegal Direct mode error
-	INX	HL		; Check if line# = FFFF (direct mode)
-	MOV	A,L
-	ORA	H
-	JZ	Error		; Error if in direct mode
-	CALL	InputLineWithPrompt	; Get user input
-	JMP	InputReadCommon	; Join common code
+	push	hl		; Save program pointer
+	lhld	CURRENT_LINE	; Get current line number
+	mvi	e,16H		; ID - Illegal Direct mode error
+	inx	hl		; Check if line# = FFFF (direct mode)
+	mov	a,l
+	ora	h
+	jz	Error		; Error if in direct mode
+	call	InputLineWithPrompt	; Get user input
+	jmp	InputReadCommon	; Join common code
 ;=============================================================================
 ; READ Handler
 ; Reads data from DATA statements in the program
 ;=============================================================================
 Read:
-	PUSH	HL		; Save program pointer
-	LHLD	DATA_PROG_PTR	; Get current DATA pointer
-InputReadCommon	EQU	$+1	; Entry at AF byte = XRA A (clears A for INPUT)
-	ORI	0AFH		; Set A to non-zero (marks as READ)
+	push	hl		; Save program pointer
+	lhld	DATA_PROG_PTR	; Get current DATA pointer
+InputReadCommon	equ	$+1	; Entry at AF byte = XRA A (clears A for INPUT)
+	ori	0AFH		; Set A to non-zero (marks as READ)
 ;-----------------------------------------------------------------------------
 ; Common code for INPUT and READ
 ; A=0 for INPUT, A<>0 for READ
 ;-----------------------------------------------------------------------------
-	STA	INPUT_OR_READ	; Store INPUT/READ flag
-	XTHL			; HL=prog ptr, (SP)=data ptr
-	DB	01H		; LXI B - skip next 2 bytes
+	sta	INPUT_OR_READ	; Store INPUT/READ flag
+	xthl			; HL=prog ptr, (SP)=data ptr
+	db	01H		; LXI B - skip next 2 bytes
 ReadNext:
-	RST	1		; Syntax check for comma
-	DB	','
-	CALL	GetVar		; Get variable address in DE
-	XTHL			; HL=data ptr, (SP)=prog ptr
-	PUSH	DE		; Save variable address
+	rst	1		; Syntax check for comma
+	db	','
+	call	GetVar		; Get variable address in DE
+	xthl			; HL=data ptr, (SP)=prog ptr
+	push	de		; Save variable address
 	; Check what's at data pointer
-	MOV	A,M		; Get data character
-	CPI	','		; Is it comma separator?
-	JZ	GotDataItem	; If comma, we have data
-	ORA	A		; Is it null (end of line)?
-	JNZ	SyntaxError	; Error if not null or comma
+	mov	a,m		; Get data character
+	cpi	','		; Is it comma separator?
+	jz	GotDataItem	; If comma, we have data
+	ora	a		; Is it null (end of line)?
+	jnz	SyntaxError	; Error if not null or comma
 	; Need more data
-	LDA	INPUT_OR_READ	; Check if INPUT or READ
-	ORA	A
-	INX	HL		; Advance past null
-	JNZ	ScanForData	; If READ, find next DATA line (skip POP HL)
+	lda	INPUT_OR_READ	; Check if INPUT or READ
+	ora	a
+	inx	hl		; Advance past null
+	jnz	ScanForData	; If READ, find next DATA line (skip POP HL)
 	; INPUT needs another '?' prompt
-	MVI	A,'?'		; Print question mark
-	RST	3
-	CALL	InputLineWithPrompt	; Get more input
+	mvi	a,'?'		; Print question mark
+	rst	3
+	call	InputLineWithPrompt	; Get more input
 GotDataItem:
-	POP	DE		; Restore variable address
-	INX	HL		; Skip comma/advance to data
-	CALL	AssignVar	; Assign data to variable
-	XTHL			; HL=prog ptr, (SP)=data ptr
-	DCX	HL		; Back up (AssignVar advanced it)
-	RST	2		; Get next character
-	JNZ	ReadNext	; If more vars, continue
+	pop	de		; Restore variable address
+	inx	hl		; Skip comma/advance to data
+	call	AssignVar	; Assign data to variable
+	xthl			; HL=prog ptr, (SP)=data ptr
+	dcx	hl		; Back up (AssignVar advanced it)
+	rst	2		; Get next character
+	jnz	ReadNext	; If more vars, continue
 	; Done with all variables
-	POP	DE		; DE = data pointer
-	LDA	INPUT_OR_READ	; Check if INPUT or READ
-	ORA	A
-	RZ			; Return if INPUT
-	XCHG			; HL = data pointer
-	JNZ	SaveDataPtr	; Save new DATA pointer
+	pop	de		; DE = data pointer
+	lda	INPUT_OR_READ	; Check if INPUT or READ
+	ora	a
+	rz			; Return if INPUT
+	xchg			; HL = data pointer
+	jnz	SaveDataPtr	; Save new DATA pointer
 ;-----------------------------------------------------------------------------
 ; NextDataLine - Scan for next DATA statement
 ;-----------------------------------------------------------------------------
 NextDataLine:
-	POP	HL		; Get current position
+	pop	hl		; Get current position
 ScanForData:
-	RST	6		; Get next line address
-	MOV	A,C		; Check if end of program
-	ORA	B
-	MVI	E,06H		; OD - Out of Data error
-	JZ	Error		; Error if no more lines
-	INX	HL		; Skip line number
-	RST	2		; Get first keyword
-	CPI	83H		; Is it DATA keyword?
-	JNZ	NextDataLine	; If not, try next line
-	POP	BC		; Discard saved pointer
-	JMP	GotDataItem	; Found DATA, get item
+	rst	6		; Get next line address
+	mov	a,c		; Check if end of program
+	ora	b
+	mvi	e,06H		; OD - Out of Data error
+	jz	Error		; Error if no more lines
+	inx	hl		; Skip line number
+	rst	2		; Get first keyword
+	cpi	83H		; Is it DATA keyword?
+	jnz	NextDataLine	; If not, try next line
+	pop	bc		; Discard saved pointer
+	jmp	GotDataItem	; Found DATA, get item
 ;=============================================================================
 ; NEXT Handler
 ; Increments FOR loop variable and tests against limit.
@@ -1413,178 +1455,178 @@ ScanForData:
 ; If complete, removes FOR structure from stack and continues.
 ;=============================================================================
 Next:
-	CALL	GetVar		; Get loop variable address in DE
-	SHLD	PROG_PTR_TEMP	; Save prog ptr (end of NEXT stmt)
-	CALL	GetFlowPtr	; Find FOR struct on stack
-	SPHL			; Set SP to FOR structure
-	PUSH	DE		; Save loop variable address
-	MOV	A,M		; Get direction byte from struct
-	INX	HL		; Point to STEP value
-	PUSH	PSW		; Save direction byte
-	PUSH	DE		; Save var address again
-	MVI	E,00H		; NF - Next without For error
-	JNZ	Error		; Error if no FOR found
+	call	GetVar		; Get loop variable address in DE
+	shld	PROG_PTR_TEMP	; Save prog ptr (end of NEXT stmt)
+	call	GetFlowPtr	; Find FOR struct on stack
+	sphl			; Set SP to FOR structure
+	push	de		; Save loop variable address
+	mov	a,m		; Get direction byte from struct
+	inx	hl		; Point to STEP value
+	push	psw		; Save direction byte
+	push	de		; Save var address again
+	mvi	e,00H		; NF - Next without For error
+	jnz	Error		; Error if no FOR found
 	; Load STEP value into FACCUM
-	CALL	FLoadFromMem	; FACCUM = STEP value
-	XTHL			; HL = var addr, (SP) = struct ptr
+	call	FLoadFromMem	; FACCUM = STEP value
+	xthl			; HL = var addr, (SP) = struct ptr
 	; Add STEP to loop variable
-	PUSH	HL		; Save var address
-	CALL	FAddMem_load	; FACCUM = var + STEP
-	POP	HL		; HL = var address
-	CALL	FCopyToMem	; Store updated var value
+	push	hl		; Save var address
+	call	FAddMem_load	; FACCUM = var + STEP
+	pop	hl		; HL = var address
+	call	FCopyToMem	; Store updated var value
 	; Load TO limit value
-	POP	HL		; HL = struct ptr (now at TO value)
-	CALL	FLoadBCDEfromMem	; BCDE = TO limit
+	pop	hl		; HL = struct ptr (now at TO value)
+	call	FLoadBCDEfromMem	; BCDE = TO limit
 	; Compare var to limit
-	PUSH	HL		; Save struct ptr
-	CALL	FCompareWithBCDE ; Compare var to limit (-1,0,1)
-	POP	HL		; Restore struct ptr
-	POP	BC		; B = direction byte (1=up, -1=down)
+	push	hl		; Save struct ptr
+	call	FCompareWithBCDE ; Compare var to limit (-1,0,1)
+	pop	hl		; Restore struct ptr
+	pop	bc		; B = direction byte (1=up, -1=down)
 	; Check if loop complete: compare result - direction = 0 means done
-	SUB	B		; If result=direction, loop done
-	CALL	FLoadBCDEfromMem	; BC=FOR stmt ptr, DE=line number
-	JZ	ForLoopDone	; Jump if loop complete
+	sub	b		; If result=direction, loop done
+	call	FLoadBCDEfromMem	; BC=FOR stmt ptr, DE=line number
+	jz	ForLoopDone	; Jump if loop complete
 	; Loop not done - go back to FOR statement
-	XCHG			; HL = line number
-	SHLD	CURRENT_LINE	; Set current line
-	MOV	L,C		; HL = FOR statement pointer
-	MOV	H,B
-	JMP	EndOfForHandler	; Push FOR token and execute
+	xchg			; HL = line number
+	shld	CURRENT_LINE	; Set current line
+	mov	l,c		; HL = FOR statement pointer
+	mov	h,b
+	jmp	EndOfForHandler	; Push FOR token and execute
 ForLoopDone:
-	SPHL			; Remove FOR struct from stack
-	LHLD	PROG_PTR_TEMP	; Get ptr to end of NEXT
-	JMP	ExecNext	; Continue after NEXT
+	sphl			; Remove FOR struct from stack
+	lhld	PROG_PTR_TEMP	; Get ptr to end of NEXT
+	jmp	ExecNext	; Continue after NEXT
 ;=============================================================================
 ; Expression Evaluation
 ; EvalExpression expects '(' first, ArithParse doesn't
 ; Returns result in FACCUM
 ;=============================================================================
 EvalExpression:
-	RST	1		; Syntax check for '('
-	DB	'('
+	rst	1		; Syntax check for '('
+	db	'('
 ;-----------------------------------------------------------------------------
 ; ArithParse - Parse and evaluate arithmetic expression
 ; Uses operator precedence parsing with the KW_ARITH_OP_FNS table
 ;-----------------------------------------------------------------------------
 ArithParse:
-	DCX	HL		; Back up (will be advanced by NextChar)
+	dcx	hl		; Back up (will be advanced by NextChar)
 ArithParseLoop:
-	MVI	D,00H		; D = current precedence level
+	mvi	d,00H		; D = current precedence level
 ArithParsePrecedence:
-	PUSH	DE		; Save precedence
-	MVI	C,01H		; Need 1 word stack space
-	CALL	CheckEnoughVarSpace
-	CALL	EvalTerm	; Evaluate a term (number, var, function)
-	SHLD	EXPR_PTR_TEMP	; Save program pointer
+	push	de		; Save precedence
+	mvi	c,01H		; Need 1 word stack space
+	call	CheckEnoughVarSpace
+	call	EvalTerm	; Evaluate a term (number, var, function)
+	shld	EXPR_PTR_TEMP	; Save program pointer
 ;-----------------------------------------------------------------------------
 ; ArithParseOp - Check for arithmetic operator after term
 ;-----------------------------------------------------------------------------
 ArithParseOp:
-	LHLD	EXPR_PTR_TEMP	; Restore program pointer
-	POP	BC		; B = previous precedence
-	MOV	A,M		; Get next character
-	MVI	D,00H
-	SUI	98H		; Subtract KWID_+ (first arith op)
-	RC			; Return if < '+' token
-	CPI	04H		; Check if +, -, *, /
-	RNC			; Return if not arithmetic operator
+	lhld	EXPR_PTR_TEMP	; Restore program pointer
+	pop	bc		; B = previous precedence
+	mov	a,m		; Get next character
+	mvi	d,00H
+	sui	98H		; Subtract KWID_+ (first arith op)
+	rc			; Return if < '+' token
+	cpi	04H		; Check if +, -, *, /
+	rnc			; Return if not arithmetic operator
 	; Calculate offset into KW_ARITH_OP_FNS table (3 bytes per entry)
-	MOV	E,A		; E = operator index
-	RLC			; A = index * 2
-	ADD	E		; A = index * 3
-	MOV	E,A		; DE = offset
-	LXI	HL,KW_ARITH_OP_FNS
-	DAD	DE		; HL points to table entry
+	mov	e,a		; E = operator index
+	rlc			; A = index * 2
+	add	e		; A = index * 3
+	mov	e,a		; DE = offset
+	lxi	hl,KW_ARITH_OP_FNS
+	dad	de		; HL points to table entry
 	; Check operator precedence
-	MOV	A,B		; A = previous precedence
-	MOV	D,M		; D = this operator's precedence
-	CMP	D		; Compare precedences
-	RNC			; Return if prev >= this (lower precedence)
+	mov	a,b		; A = previous precedence
+	mov	d,m		; D = this operator's precedence
+	cmp	d		; Compare precedences
+	rnc			; Return if prev >= this (lower precedence)
 	; Higher precedence - need to evaluate this operator first
-	INX	HL		; Point to function address
-	PUSH	BC		; Save previous precedence
-	LXI	BC,ArithParseOp	; Return address after operation
-	PUSH	BC
-	MOV	C,D		; Save new precedence in C
-	CALL	FPush		; Push current value onto stack
-	MOV	D,C		; Restore precedence to D
-	RST	6		; Push function address from (HL)
-	LHLD	EXPR_PTR_TEMP	; Restore program pointer
-	JMP	ArithParsePrecedence	; Parse next term with new precedence
+	inx	hl		; Point to function address
+	push	bc		; Save previous precedence
+	lxi	bc,ArithParseOp	; Return address after operation
+	push	bc
+	mov	c,d		; Save new precedence in C
+	call	FPush		; Push current value onto stack
+	mov	d,c		; Restore precedence to D
+	rst	6		; Push function address from (HL)
+	lhld	EXPR_PTR_TEMP	; Restore program pointer
+	jmp	ArithParsePrecedence	; Parse next term with new precedence
 ;-----------------------------------------------------------------------------
 ; EvalTerm - Evaluate a single term in an expression
 ; Can be: number, variable, function call, or (expression)
 ;-----------------------------------------------------------------------------
 EvalTerm:
-	RST	2		; Get next character
-	JC	FIn		; If digit, parse number
-	CALL	CharIsAlpha	; Check if alphabetic
-	JNC	EvalVarTerm	; If letter, evaluate variable
-	CPI	98H		; Is it '+' (unary plus)?
-	JZ	EvalTerm	; Ignore leading '+'
-	CPI	'.'		; Decimal point?
-	JZ	FIn		; Parse number starting with '.'
-	CPI	99H		; Is it '-' (unary minus)?
-	JZ	EvalMinusTerm	; Handle negation
-	SUI	9FH		; Subtract first inline function token
-	JNC	EvalInlineFn	; If inline function, evaluate it
+	rst	2		; Get next character
+	jc	FIn		; If digit, parse number
+	call	CharIsAlpha	; Check if alphabetic
+	jnc	EvalVarTerm	; If letter, evaluate variable
+	cpi	98H		; Is it '+' (unary plus)?
+	jz	EvalTerm	; Ignore leading '+'
+	cpi	'.'		; Decimal point?
+	jz	FIn		; Parse number starting with '.'
+	cpi	99H		; Is it '-' (unary minus)?
+	jz	EvalMinusTerm	; Handle negation
+	sui	9FH		; Subtract first inline function token
+	jnc	EvalInlineFn	; If inline function, evaluate it
 	; Must be parenthesized expression
 EvalBracketed:
-	CALL	EvalExpression	; Evaluate (expects and consumes '(')
-	RST	1		; Syntax check for ')'
-	DB	')'
-	RET
+	call	EvalExpression	; Evaluate (expects and consumes '(')
+	rst	1		; Syntax check for ')'
+	db	')'
+	ret
 ;-----------------------------------------------------------------------------
 ; EvalMinusTerm - Evaluate negated term (-x)
 ;-----------------------------------------------------------------------------
 EvalMinusTerm:
-	CALL	EvalTerm	; Evaluate the term
-	PUSH	HL		; Save program pointer
-	CALL	FNegate		; Negate FACCUM
+	call	EvalTerm	; Evaluate the term
+	push	hl		; Save program pointer
+	call	FNegate		; Negate FACCUM
 PopHLRet:
-	POP	HL		; Restore program pointer
-	RET
+	pop	hl		; Restore program pointer
+	ret
 ;-----------------------------------------------------------------------------
 ; EvalVarTerm - Evaluate a variable reference
 ;-----------------------------------------------------------------------------
 EvalVarTerm:
-	CALL	GetVar		; Get variable address in DE
-	PUSH	HL		; Save program pointer
-	XCHG			; HL = variable address
-	CALL	FLoadFromMem	; Load variable value into FACCUM
-	POP	HL		; Restore program pointer
-	RET
+	call	GetVar		; Get variable address in DE
+	push	hl		; Save program pointer
+	xchg			; HL = variable address
+	call	FLoadFromMem	; Load variable value into FACCUM
+	pop	hl		; Restore program pointer
+	ret
 ;-----------------------------------------------------------------------------
 ; EvalInlineFn - Evaluate inline function (SGN, INT, ABS, etc.)
 ;-----------------------------------------------------------------------------
 EvalInlineFn:
-	MVI	B,00H		; Calculate offset into KW_INLINE_FNS
-	RLC			; A = function index * 2
-	MOV	C,A		; BC = offset
-	PUSH	BC		; Save offset
-	RST	2		; Get next char
-	CALL	EvalBracketed	; Evaluate argument
-	XTHL			; HL = offset, (SP) = prog ptr
-	LXI	DE,PopHLRet	; Return address (POP HL; RET)
-	PUSH	DE
-	LXI	BC,KW_INLINE_FNS
-	DAD	BC		; HL = function address ptr
-	RST	6		; Push function address
-	RET			; Jump to function
+	mvi	b,00H		; Calculate offset into KW_INLINE_FNS
+	rlc			; A = function index * 2
+	mov	c,a		; BC = offset
+	push	bc		; Save offset
+	rst	2		; Get next char
+	call	EvalBracketed	; Evaluate argument
+	xthl			; HL = offset, (SP) = prog ptr
+	lxi	de,PopHLRet	; Return address (POP HL; RET)
+	push	de
+	lxi	bc,KW_INLINE_FNS
+	dad	bc		; HL = function address ptr
+	rst	6		; Push function address
+	ret			; Jump to function
 ;=============================================================================
 ; DIM Statement Handler
 ; Declares arrays. DimContd is the continuation point for multiple dims.
 ; Format: DIM A(10), B(20), ...
 ;=============================================================================
 DimContd:
-	DCX	HL		; Back up program pointer
-	RST	2		; NextChar - get next char
-	RZ			; Return if end of line
-	RST	1		; SyntaxCheck for comma
-	DB	','
-Dim:	LXI	BC,DimContd	; Set return address for next DIM item
-	PUSH	BC
-	DB	0F6H		; ORI 0AFH - Set A non-zero for DIM
+	dcx	hl		; Back up program pointer
+	rst	2		; NextChar - get next char
+	rz			; Return if end of line
+	rst	1		; SyntaxCheck for comma
+	db	','
+Dim:	lxi	bc,DimContd	; Set return address for next DIM item
+	push	bc
+	db	0F6H		; ORI 0AFH - Set A non-zero for DIM
 				; Fall through to GetVar which starts with AF (XRA A)
 				; When entered at Dim+5, executes ORI 0AFH, A=non-zero
 				; When entered at GetVar, executes XRA A, A=0
@@ -1597,193 +1639,193 @@ Dim:	LXI	BC,DimContd	; Set return address for next DIM item
 ; Exit:  DE=pointer to variable value (4 bytes)
 ;        HL=updated program pointer
 ;=============================================================================
-GetVar:	XRA	A		; Clear A (also serves as operand for ORI above)
-	STA	DIM_OR_EVAL	; Store DIM/EVAL flag
-	MOV	B,M		; B = first char of variable name
-	CALL	CharIsAlpha	; Check if alphabetic
-	JC	SyntaxError	; Error if not alpha
-	XRA	A		; Clear A
-	MOV	C,A		; C = 0 (default second char)
-	RST	2		; NextChar
-	JNC	GetVarCheckArray ; If not alphanumeric, skip to array check
-	MOV	C,A		; C = second char of variable name
-	RST	2		; NextChar
+GetVar:	xra	a		; Clear A (also serves as operand for ORI above)
+	sta	DIM_OR_EVAL	; Store DIM/EVAL flag
+	mov	b,m		; B = first char of variable name
+	call	CharIsAlpha	; Check if alphabetic
+	jc	SyntaxError	; Error if not alpha
+	xra	a		; Clear A
+	mov	c,a		; C = 0 (default second char)
+	rst	2		; NextChar
+	jnc	GetVarCheckArray ; If not alphanumeric, skip to array check
+	mov	c,a		; C = second char of variable name
+	rst	2		; NextChar
 ; Check if next char is '(' - if so, it's an array access
 GetVarCheckArray:
-	SUI	'('		; Subtract '(' (28H)
-	JZ	GetArrayVar	; Jump if array variable
+	sui	'('		; Subtract '(' (28H)
+	jz	GetArrayVar	; Jump if array variable
 	; Simple variable lookup - search VAR_BASE to VAR_ARRAY_BASE
-	PUSH	HL		; Save program pointer
-	LHLD	VAR_ARRAY_BASE	; DE = end of simple variables
-	XCHG
-	LHLD	VAR_BASE	; HL = start of simple variables
+	push	hl		; Save program pointer
+	lhld	VAR_ARRAY_BASE	; DE = end of simple variables
+	xchg
+	lhld	VAR_BASE	; HL = start of simple variables
 ; Loop through existing variables looking for name match
 FindVarLoop:
-	RST	4		; CompareHLDE - at end of variables?
-	JZ	AllocNewVar	; Not found, allocate new variable
-	MOV	A,C		; Compare second char of name
-	SUB	M		; With stored variable name
-	INX	HL
-	JNZ	FindVarNext	; No match on second char
-	MOV	A,B		; Compare first char
-	SUB	M
+	rst	4		; CompareHLDE - at end of variables?
+	jz	AllocNewVar	; Not found, allocate new variable
+	mov	a,c		; Compare second char of name
+	sub	m		; With stored variable name
+	inx	hl
+	jnz	FindVarNext	; No match on second char
+	mov	a,b		; Compare first char
+	sub	m
 FindVarNext:
-	INX	HL
-	JZ	VarFound	; Names match - variable found
-	INX	HL		; Skip over 4-byte value
-	INX	HL
-	INX	HL
-	INX	HL
-	JMP	FindVarLoop	; Try next variable
+	inx	hl
+	jz	VarFound	; Names match - variable found
+	inx	hl		; Skip over 4-byte value
+	inx	hl
+	inx	hl
+	inx	hl
+	jmp	FindVarLoop	; Try next variable
 ; Allocate new variable - but first check if called from EvalTerm
 ; If so, don't allocate (undeclared variable in expression = 0)
 AllocNewVar:
-	POP	HL		; HL = prog ptr
-	XTHL			; (SP) = prog ptr, HL = return address
-	PUSH	DE		; Save DE
-	LXI	DE,EvalVarTerm+3 ; Address inside EvalTerm
-	RST	4		; Compare return address
-	POP	DE		; Restore DE
-	JZ	CalledFromEval	; If from evaluator, don't allocate
+	pop	hl		; HL = prog ptr
+	xthl			; (SP) = prog ptr, HL = return address
+	push	de		; Save DE
+	lxi	de,EvalVarTerm+3 ; Address inside EvalTerm
+	rst	4		; Compare return address
+	pop	de		; Restore DE
+	jz	CalledFromEval	; If from evaluator, don't allocate
 	; OK to allocate - restore stack and proceed
-	XTHL			; (SP) = ret addr, HL = prog ptr
-	PUSH	HL		; Prog ptr back on stack
-	PUSH	BC		; Save variable name BC
-	LXI	BC,6		; Need 6 bytes (2 name + 4 value)
-	LHLD	VAR_TOP		; Get current top
-	PUSH	HL		; Save old top
-	DAD	BC		; HL = new top
-	POP	BC		; BC = old top
-	PUSH	HL		; Save new top
-	CALL	CopyMemoryUp	; Move array block up 6 bytes
-	POP	HL
-	SHLD	VAR_TOP		; Update VAR_TOP
-	MOV	H,B		; HL = old VAR_TOP (where arrays were)
-	MOV	L,C
-	SHLD	VAR_ARRAY_BASE	; Update VAR_ARRAY_BASE
+	xthl			; (SP) = ret addr, HL = prog ptr
+	push	hl		; Prog ptr back on stack
+	push	bc		; Save variable name BC
+	lxi	bc,6		; Need 6 bytes (2 name + 4 value)
+	lhld	VAR_TOP		; Get current top
+	push	hl		; Save old top
+	dad	bc		; HL = new top
+	pop	bc		; BC = old top
+	push	hl		; Save new top
+	call	CopyMemoryUp	; Move array block up 6 bytes
+	pop	hl
+	shld	VAR_TOP		; Update VAR_TOP
+	mov	h,b		; HL = old VAR_TOP (where arrays were)
+	mov	l,c
+	shld	VAR_ARRAY_BASE	; Update VAR_ARRAY_BASE
 ; Initialize new variable to zero (6 bytes)
 InitVarLoop:
-	DCX	HL
-	MVI	M,0
-	RST	4		; CompareHLDE - done?
-	JNZ	InitVarLoop
+	dcx	hl
+	mvi	m,0
+	rst	4		; CompareHLDE - done?
+	jnz	InitVarLoop
 	; Write variable name at start
-	POP	DE		; DE = variable name (BC was pushed)
-	MOV	M,E		; Store second char of name
-	INX	HL
-	MOV	M,D		; Store first char of name
-	INX	HL
+	pop	de		; DE = variable name (BC was pushed)
+	mov	m,e		; Store second char of name
+	inx	hl
+	mov	m,d		; Store first char of name
+	inx	hl
 ; Variable found or allocated - return with DE pointing to value
 VarFound:
-	XCHG			; DE = ptr to variable value
-	POP	HL		; HL = program pointer
-	RET
+	xchg			; DE = ptr to variable value
+	pop	hl		; HL = program pointer
+	ret
 ; Called from expression evaluator - return with FACCUM = 0
 CalledFromEval:
-	STA	FACCUM_EXP	; A=0 from compare, zero the exponent
-	POP	HL		; Restore program pointer
-	RET
+	sta	FACCUM_EXP	; A=0 from compare, zero the exponent
+	pop	hl		; Restore program pointer
+	ret
 ;=============================================================================
 ; GetArrayVar - Array Variable Access/Allocation
 ; BC = variable name, HL = prog ptr (after '(')
 ; DIM_OR_EVAL: 0 = accessing element, NZ = declaring array
 ;=============================================================================
 GetArrayVar:
-	PUSH	BC		; Save variable name
-	LDA	DIM_OR_EVAL	; Get DIM/EVAL flag
-	PUSH	PSW		; Save it
-	CALL	GetSubscript	; Get subscript into DE
-	RST	1		; SyntaxCheck for ')'
-	DB	')'
-	POP	PSW		; Restore DIM/EVAL flag
-	STA	DIM_OR_EVAL
-	XTHL			; HL = var name, (SP) = prog ptr
-	XCHG			; DE = var name, HL = subscript
+	push	bc		; Save variable name
+	lda	DIM_OR_EVAL	; Get DIM/EVAL flag
+	push	psw		; Save it
+	call	GetSubscript	; Get subscript into DE
+	rst	1		; SyntaxCheck for ')'
+	db	')'
+	pop	psw		; Restore DIM/EVAL flag
+	sta	DIM_OR_EVAL
+	xthl			; HL = var name, (SP) = prog ptr
+	xchg			; DE = var name, HL = subscript
 	; Multiply subscript by 4 (each element is 4 bytes)
-	DAD	HL		; *2
-	DAD	HL		; *4
-	PUSH	HL		; Save subscript*4
-	LHLD	VAR_ARRAY_BASE	; Start of array storage
-	DB	01H		; LXI BC,... (skip next 2 bytes)
+	dad	hl		; *2
+	dad	hl		; *4
+	push	hl		; Save subscript*4
+	lhld	VAR_ARRAY_BASE	; Start of array storage
+	db	01H		; LXI BC,... (skip next 2 bytes)
 ; Find array loop - search through arrays for matching name
 FindArrayLoop:
-	POP	BC		; BC = subscript*4 (or junk first time)
-	DAD	BC		; Advance pointer
-	XCHG			; DE = current array ptr
-	PUSH	HL		; Save subscript*4
-	LHLD	VAR_TOP		; End of array storage
-	RST	4		; CompareHLDE - at end?
-	XCHG
-	POP	DE		; DE = subscript*4
-	JZ	AllocArray	; Not found, allocate new array
+	pop	bc		; BC = subscript*4 (or junk first time)
+	dad	bc		; Advance pointer
+	xchg			; DE = current array ptr
+	push	hl		; Save subscript*4
+	lhld	VAR_TOP		; End of array storage
+	rst	4		; CompareHLDE - at end?
+	xchg
+	pop	de		; DE = subscript*4
+	jz	AllocArray	; Not found, allocate new array
 	; Check if this array matches our variable name
-	RST	6		; PushNextWord - get array name
-	XTHL			; (SP) = array name, HL = subscript*4
-	RST	4		; Compare names
-	POP	HL		; HL = array name from this array
-	RST	6		; PushNextWord - get array size
-	JNZ	FindArrayLoop	; No match, try next array
+	rst	6		; PushNextWord - get array name
+	xthl			; (SP) = array name, HL = subscript*4
+	rst	4		; Compare names
+	pop	hl		; HL = array name from this array
+	rst	6		; PushNextWord - get array size
+	jnz	FindArrayLoop	; No match, try next array
 	; Array found - check if we're in DIM (error - redim)
-	LDA	DIM_OR_EVAL
-	ORA	A
-	MVI	E,12H		; DD error - Duplicate Definition
-	JNZ	Error
+	lda	DIM_OR_EVAL
+	ora	a
+	mvi	e,12H		; DD error - Duplicate Definition
+	jnz	Error
 ; Array element retrieval - check subscript is in bounds
 GetArrayElement:
-	POP	DE		; DE = subscript*4
-	DCX	DE		; Adjust for compare
-	XTHL			; HL = subscript*4 from stack, (SP) = array size
-	RST	4		; Compare subscript vs array size
-	MVI	E,10H		; BS error - Bad Subscript
-	JNC	Error		; Error if subscript >= size
+	pop	de		; DE = subscript*4
+	dcx	de		; Adjust for compare
+	xthl			; HL = subscript*4 from stack, (SP) = array size
+	rst	4		; Compare subscript vs array size
+	mvi	e,10H		; BS error - Bad Subscript
+	jnc	Error		; Error if subscript >= size
 	; Calculate element address
-	POP	DE		; DE = array base (after size word)
-	DAD	DE		; HL = element address
-	POP	DE		; DE = prog ptr
-	XCHG			; DE = element ptr, HL = prog ptr
-	RET
+	pop	de		; DE = array base (after size word)
+	dad	de		; HL = element address
+	pop	de		; DE = prog ptr
+	xchg			; DE = element ptr, HL = prog ptr
+	ret
 ;=============================================================================
 ; AllocArray - Allocate space for new array
 ; DE = variable name, HL = ptr to where array will be stored
 ; Stack has subscript*4 (the size requested)
 ;=============================================================================
 AllocArray:
-	MOV	M,E		; Store array name (2 bytes)
-	INX	HL
-	MOV	M,D
-	INX	HL
+	mov	m,e		; Store array name (2 bytes)
+	inx	hl
+	mov	m,d
+	inx	hl
 	; Set default size to 44 bytes (11 elements * 4 bytes)
 	; This is for implicit DIM (first use without DIM statement)
-	LXI	DE,44		; Default size: 11 elements (0-10)
-	LDA	DIM_OR_EVAL
-	ORA	A
-	JZ	StoreArraySize	; If not DIM, use default
+	lxi	de,44		; Default size: 11 elements (0-10)
+	lda	DIM_OR_EVAL
+	ora	a
+	jz	StoreArraySize	; If not DIM, use default
 	; DIM statement - get requested size from stack
-	POP	DE		; DE = subscript*4 (requested size)
-	PUSH	DE		; Put it back
-	INX	DE		; Add 4 for one extra element
-	INX	DE		; (subscript is 0-based)
-	INX	DE
-	INX	DE
+	pop	de		; DE = subscript*4 (requested size)
+	push	de		; Put it back
+	inx	de		; Add 4 for one extra element
+	inx	de		; (subscript is 0-based)
+	inx	de
+	inx	de
 StoreArraySize:
-	PUSH	DE		; Save size
-	MOV	M,E		; Store array size (2 bytes)
-	INX	HL
-	MOV	M,D
-	INX	HL
+	push	de		; Save size
+	mov	m,e		; Store array size (2 bytes)
+	inx	hl
+	mov	m,d
+	inx	hl
 	; Check memory and update VAR_TOP
-	PUSH	HL		; Save ptr to array data area
-	DAD	DE		; HL = new VAR_TOP
-	CALL	CheckEnoughMem+1 ; Make sure it fits (enter at PUSH HL)
-	SHLD	VAR_TOP		; Update VAR_TOP
-	POP	DE		; DE = array data start
+	push	hl		; Save ptr to array data area
+	dad	de		; HL = new VAR_TOP
+	call	CheckEnoughMem+1 ; Make sure it fits (enter at PUSH HL)
+	shld	VAR_TOP		; Update VAR_TOP
+	pop	de		; DE = array data start
 ; Initialize all array elements to zero
 InitArrayElements:
-	DCX	HL
-	MVI	M,0
-	RST	4		; CompareHLDE - done?
-	JNZ	InitArrayElements
-	JMP	GetArrayElement	; Return element pointer
+	dcx	hl
+	mvi	m,0
+	rst	4		; CompareHLDE - done?
+	jnz	InitArrayElements
+	jmp	GetArrayElement	; Return element pointer
 ;=============================================================================
 ; Floating Point Math Routines
 ; FACCUM format: 4 bytes - 3 bytes mantissa + 1 byte exponent
@@ -1798,19 +1840,19 @@ InitArrayElements:
 ; NOTE: This routine is unused in 4K BASIC (for 8K compatibility)
 ;-----------------------------------------------------------------------------
 FWordToFloat:
-	MOV	D,B		; D = low byte
-	MVI	E,0		; E = 0 (low mantissa)
-	MVI	B,90H		; Exponent = 2^16 (144 decimal)
-	JMP	FCharToFloat+5	; Continue in conversion routine
+	mov	d,b		; D = low byte
+	mvi	e,0		; E = 0 (low mantissa)
+	mvi	b,90H		; Exponent = 2^16 (144 decimal)
+	jmp	FCharToFloat+5	; Continue in conversion routine
 
 ;-----------------------------------------------------------------------------
 ; FAddMem - Add 0.5 to FACCUM (for rounding)
 ;-----------------------------------------------------------------------------
 FAddMem:
-	LXI	HL,ONE_HALF	; Point to 0.5 constant
+	lxi	hl,ONE_HALF	; Point to 0.5 constant
 FAddMem_load:
-	CALL	FLoadBCDEfromMem ; Load BCDE from memory
-	JMP	FAdd		; Add to FACCUM
+	call	FLoadBCDEfromMem ; Load BCDE from memory
+	jmp	FAdd		; Add to FACCUM
 
 ;-----------------------------------------------------------------------------
 ; FSub - Floating point subtraction: FACCUM = stack - FACCUM
@@ -1818,71 +1860,71 @@ FAddMem_load:
 ; Overlapping instruction trick: Entry at FSub-2 pops BC/DE from stack
 ;-----------------------------------------------------------------------------
 FSubEntry:
-	DB	0C1H		; POP BC (or part of LXI operand when skipped)
-	DB	0D1H		; POP DE (or part of LXI operand when skipped)
-FSub:	CALL	FNegate		; Negate RHS
-FAddEntry	EQU	$+1	; Entry point at C1 D1 (POP BC; POP DE when jumped to)
-	LXI	HL,0D1C1H	; Skip to FAdd (C1 D1 operand = POP BC; POP DE trick)
+	db	0C1H		; POP BC (or part of LXI operand when skipped)
+	db	0D1H		; POP DE (or part of LXI operand when skipped)
+FSub:	call	FNegate		; Negate RHS
+FAddEntry	equ	$+1	; Entry point at C1 D1 (POP BC; POP DE when jumped to)
+	lxi	hl,0D1C1H	; Skip to FAdd (C1 D1 operand = POP BC; POP DE trick)
 ;-----------------------------------------------------------------------------
 ; FAdd - Floating point addition: FACCUM = BCDE + FACCUM
 ; Entry: LHS in BCDE, RHS in FACCUM
 ; Exit: Result in FACCUM
 ;-----------------------------------------------------------------------------
-FAdd:	MOV	A,B		; Check LHS exponent
-	ORA	A		; If LHS is zero
-	RZ			; Just return (FACCUM unchanged)
-	LDA	FACCUM_EXP	; Check RHS exponent
-	ORA	A
-	JZ	FLoadFromBCDE	; If RHS=0, result is LHS
+FAdd:	mov	a,b		; Check LHS exponent
+	ora	a		; If LHS is zero
+	rz			; Just return (FACCUM unchanged)
+	lda	FACCUM_EXP	; Check RHS exponent
+	ora	a
+	jz	FLoadFromBCDE	; If RHS=0, result is LHS
 	; Compare exponents to align mantissas
-	SUB	B		; A = RHS exp - LHS exp
-	JNC	FAddAligned	; If RHS exp >= LHS exp, continue
+	sub	b		; A = RHS exp - LHS exp
+	jnc	FAddAligned	; If RHS exp >= LHS exp, continue
 	; Swap LHS and RHS (make larger exponent in FACCUM)
-	CMA			; Negate exponent difference
-	INR	A
-	XCHG			; Swap DE
-	CALL	FPush		; Push FACCUM to stack
-	XCHG
-	CALL	FLoadFromBCDE	; Copy BCDE to FACCUM
-	POP	BC		; Pop old FACCUM to BCDE
-	POP	DE
+	cma			; Negate exponent difference
+	inr	a
+	xchg			; Swap DE
+	call	FPush		; Push FACCUM to stack
+	xchg
+	call	FLoadFromBCDE	; Copy BCDE to FACCUM
+	pop	bc		; Pop old FACCUM to BCDE
+	pop	de
 FAddAligned:
-	PUSH	PSW		; Save exponent difference
-	CALL	FUnpackMantissas ; Unpack mantissas, A = sign relationship
-	MOV	H,A		; H = sign relationship
-	POP	PSW		; A = exponent difference
-	CALL	FMantissaRtMult	; Shift LHS right by exp diff
-	ORA	H		; Check sign relationship
-	LXI	HL,FACCUM	; Point to FACCUM
-	JP	FSubMantissas	; If signs differ, subtract
+	push	psw		; Save exponent difference
+	call	FUnpackMantissas ; Unpack mantissas, A = sign relationship
+	mov	h,a		; H = sign relationship
+	pop	psw		; A = exponent difference
+	call	FMantissaRtMult	; Shift LHS right by exp diff
+	ora	h		; Check sign relationship
+	lxi	hl,FACCUM	; Point to FACCUM
+	jp	FSubMantissas	; If signs differ, subtract
 	; Signs same - add mantissas
-	CALL	FAddMantissas
-	JNC	FRoundUp	; No overflow, round up
-	INX	HL		; Point to exponent
-	INR	M		; Increment exponent
-	JZ	Overflow	; Error if overflow
-	CALL	FMantissaRtOnce	; Shift right once
-	JMP	FRoundUp
+	call	FAddMantissas
+	jnc	FRoundUp	; No overflow, round up
+	inx	hl		; Point to exponent
+	inr	m		; Increment exponent
+	jz	Overflow	; Error if overflow
+	call	FMantissaRtOnce	; Shift right once
+	jmp	FRoundUp
 ;-----------------------------------------------------------------------------
 ; FSubMantissas - Subtract LHS from RHS mantissa
 ; Entry: HL points to FACCUM, LHS in BCDE
 ; Exit: Result in BCDE
 ;-----------------------------------------------------------------------------
 FSubMantissas:
-	XRA	A		; B = 0 - B
-	SUB	B
-	MOV	B,A
-	MOV	A,M		; E = (FACCUM) - E
-	SBB	E
-	MOV	E,A
-	INX	HL
-	MOV	A,M		; D = (FACCUM+1) - D
-	SBB	D
-	MOV	D,A
-	INX	HL
-	MOV	A,M		; C = (FACCUM+2) - C
-	SBB	C
-	MOV	C,A
+	xra	a		; B = 0 - B
+	sub	b
+	mov	b,a
+	mov	a,m		; E = (FACCUM) - E
+	sbb	e
+	mov	e,a
+	inx	hl
+	mov	a,m		; D = (FACCUM+1) - D
+	sbb	d
+	mov	d,a
+	inx	hl
+	mov	a,m		; C = (FACCUM+2) - C
+	sbb	c
+	mov	c,a
 ; Fall into FNormalise
 
 ;-----------------------------------------------------------------------------
@@ -1891,47 +1933,47 @@ FSubMantissas:
 ; Exit: Normalized result in FACCUM
 ;-----------------------------------------------------------------------------
 FNormalise:
-	CC	FNegateInt	; Negate if carry set
+	cc	FNegateInt	; Negate if carry set
 FNormaliseNoNeg:
-	MVI	H,0		; H = shift count
-	MOV	A,C		; Check high byte of mantissa
-	ORA	A
-	JM	FRoundUp	; Already normalized (bit 7 set)
+	mvi	h,0		; H = shift count
+	mov	a,c		; Check high byte of mantissa
+	ora	a
+	jm	FRoundUp	; Already normalized (bit 7 set)
 ; Shift left until bit 7 of C is set
 FNormaliseLoop:
-	CPI	0E0H		; Have we shifted 32 times?
-	JZ	FZero		; Result is zero
-	DCR	H		; Count shifts
-	MOV	A,B		; Left-shift extra mantissa byte
-	ADD	A
-	MOV	B,A
-	CALL	FMantissaLeft	; Left-shift CDE
-	MOV	A,H
-	JP	FNormaliseLoop	; Loop if not done
+	cpi	0E0H		; Have we shifted 32 times?
+	jz	FZero		; Result is zero
+	dcr	h		; Count shifts
+	mov	a,b		; Left-shift extra mantissa byte
+	add	a
+	mov	b,a
+	call	FMantissaLeft	; Left-shift CDE
+	mov	a,h
+	jp	FNormaliseLoop	; Loop if not done
 	; Adjust exponent by shift count (H is negative)
-	LXI	HL,FACCUM_EXP	; Point to exponent
-	ADD	M		; Add (negative) shift count
-	MOV	M,A
-	JNC	FZero		; Underflow = zero
-	RZ
+	lxi	hl,FACCUM_EXP	; Point to exponent
+	add	m		; Add (negative) shift count
+	mov	m,a
+	jnc	FZero		; Underflow = zero
+	rz
 ;-----------------------------------------------------------------------------
 ; FRoundUp - Round up mantissa and set sign
 ; Entry: CDEB = mantissa (B is extra precision byte)
 ; Exit: Result stored in FACCUM
 ;-----------------------------------------------------------------------------
 FRoundUp:
-	MOV	A,B		; A = extra mantissa byte
-	LXI	HL,FACCUM_EXP	; Point to exponent
-	ORA	A		; If bit 7 of extra byte set
-	CM	FMantissaInc	; Round up the mantissa
+	mov	a,b		; A = extra mantissa byte
+	lxi	hl,FACCUM_EXP	; Point to exponent
+	ora	a		; If bit 7 of extra byte set
+	cm	FMantissaInc	; Round up the mantissa
 	; Set sign and store result
-	MOV	B,M		; B = exponent
-	INX	HL
-	MOV	A,M		; A = FTEMP_SIGN
-	ANI	80H		; Isolate sign bit
-	XRA	C		; Combine with mantissa high bit
-	MOV	C,A		; C = signed high mantissa
-	JMP	FLoadFromBCDE	; Store result
+	mov	b,m		; B = exponent
+	inx	hl
+	mov	a,m		; A = FTEMP_SIGN
+	ani	80H		; Isolate sign bit
+	xra	c		; Combine with mantissa high bit
+	mov	c,a		; C = signed high mantissa
+	jmp	FLoadFromBCDE	; Store result
 
 ;-----------------------------------------------------------------------------
 ; FMantissaLeft - Shift mantissa CDE left by one bit
@@ -1939,34 +1981,34 @@ FRoundUp:
 ; Exit: CDE shifted left, carry = bit shifted out
 ;-----------------------------------------------------------------------------
 FMantissaLeft:
-	MOV	A,E		; Shift E left
-	RAL
-	MOV	E,A
-	MOV	A,D		; Shift D left with carry
-	RAL
-	MOV	D,A
-	MOV	A,C		; Shift C left with carry
-	ADC	A
-	MOV	C,A
-	RET
+	mov	a,e		; Shift E left
+	ral
+	mov	e,a
+	mov	a,d		; Shift D left with carry
+	ral
+	mov	d,a
+	mov	a,c		; Shift C left with carry
+	adc	a
+	mov	c,a
+	ret
 
 ;-----------------------------------------------------------------------------
 ; FMantissaInc - Increment mantissa CDE
 ; Handles overflow by setting C=80H and incrementing exponent
 ;-----------------------------------------------------------------------------
 FMantissaInc:
-	INR	E
-	RNZ
-	INR	D
-	RNZ
-	INR	C
-	RNZ
-	MVI	C,80H		; Mantissa overflowed, set to 1.0
-	INR	M		; Increment exponent
-	RNZ
+	inr	e
+	rnz
+	inr	d
+	rnz
+	inr	c
+	rnz
+	mvi	c,80H		; Mantissa overflowed, set to 1.0
+	inr	m		; Increment exponent
+	rnz
 Overflow:
-	MVI	E,0AH		; OV error
-	JMP	Error
+	mvi	e,0AH		; OV error
+	jmp	Error
 
 ;-----------------------------------------------------------------------------
 ; FAddMantissas - Add mantissa at HL to mantissa in CDE
@@ -1974,42 +2016,42 @@ Overflow:
 ; Exit: CDE = sum, carry set on overflow
 ;-----------------------------------------------------------------------------
 FAddMantissas:
-	MOV	A,M		; Add low bytes
-	ADD	E
-	MOV	E,A
-	INX	HL
-	MOV	A,M		; Add middle bytes with carry
-	ADC	D
-	MOV	D,A
-	INX	HL
-	MOV	A,M		; Add high bytes with carry
-	ADC	C
-	MOV	C,A
-	RET
+	mov	a,m		; Add low bytes
+	add	e
+	mov	e,a
+	inx	hl
+	mov	a,m		; Add middle bytes with carry
+	adc	d
+	mov	d,a
+	inx	hl
+	mov	a,m		; Add high bytes with carry
+	adc	c
+	mov	c,a
+	ret
 
 ;-----------------------------------------------------------------------------
 ; FNegateInt - Negate 32-bit integer CDEB (for sign handling)
 ; Also complements FTEMP_SIGN
 ;-----------------------------------------------------------------------------
 FNegateInt:
-	LXI	HL,FTEMP_SIGN	; Complement sign
-	MOV	A,M
-	CMA
-	MOV	M,A
-	XRA	A		; CDEB = 0 - CDEB
-	MOV	L,A
-	SUB	B
-	MOV	B,A
-	MOV	A,L
-	SBB	E
-	MOV	E,A
-	MOV	A,L
-	SBB	D
-	MOV	D,A
-	MOV	A,L
-	SBB	C
-	MOV	C,A
-	RET
+	lxi	hl,FTEMP_SIGN	; Complement sign
+	mov	a,m
+	cma
+	mov	m,a
+	xra	a		; CDEB = 0 - CDEB
+	mov	l,a
+	sub	b
+	mov	b,a
+	mov	a,l
+	sbb	e
+	mov	e,a
+	mov	a,l
+	sbb	d
+	mov	d,a
+	mov	a,l
+	sbb	c
+	mov	c,a
+	ret
 
 ;-----------------------------------------------------------------------------
 ; FMantissaRtMult - Shift mantissa CDE right by A places
@@ -2017,98 +2059,98 @@ FNegateInt:
 ; Exit: CDEB = shifted mantissa (B = extra precision byte)
 ;-----------------------------------------------------------------------------
 FMantissaRtMult:
-	MVI	B,0		; Initialize extra byte
-	INR	A		; Adjust count
-	MOV	L,A
+	mvi	b,0		; Initialize extra byte
+	inr	a		; Adjust count
+	mov	l,a
 FMantissaRtLoop:
-	XRA	A
-	DCR	L
-	RZ			; Done
-	CALL	FMantissaRtOnce
-	JMP	FMantissaRtLoop
+	xra	a
+	dcr	l
+	rz			; Done
+	call	FMantissaRtOnce
+	jmp	FMantissaRtLoop
 
 ;-----------------------------------------------------------------------------
 ; FMantissaRtOnce - Shift mantissa CDEB right by one bit
 ;-----------------------------------------------------------------------------
 FMantissaRtOnce:
-	MOV	A,C		; Shift C right
-	RAR
-	MOV	C,A
-	MOV	A,D		; Shift D right with carry
-	RAR
-	MOV	D,A
-	MOV	A,E		; Shift E right with carry
-	RAR
-	MOV	E,A
-	MOV	A,B		; Shift B right with carry
-	RAR
-	MOV	B,A
-	RET
+	mov	a,c		; Shift C right
+	rar
+	mov	c,a
+	mov	a,d		; Shift D right with carry
+	rar
+	mov	d,a
+	mov	a,e		; Shift E right with carry
+	rar
+	mov	e,a
+	mov	a,b		; Shift B right with carry
+	rar
+	mov	b,a
+	ret
 ;-----------------------------------------------------------------------------
 ; FMul - Floating point multiplication: FACCUM = stack * FACCUM
 ; Uses shift-and-add algorithm for mantissa multiplication
 ;-----------------------------------------------------------------------------
 FMulEntry:
-	POP	BC		; Get LHS from stack
-	POP	DE
-FMul:	RST	5		; FTestSign - check if RHS is zero
-	RZ			; Return if zero
+	pop	bc		; Get LHS from stack
+	pop	de
+FMul:	rst	5		; FTestSign - check if RHS is zero
+	rz			; Return if zero
 	; Add exponents (L=0 means add)
-	MVI	L,0
-	CALL	FExponentAdd
+	mvi	l,0
+	call	FExponentAdd
 	; Store LHS mantissa in self-modifying code locations
-	MOV	A,C
-	STA	FMulInnerLoop+13 ; High byte of LHS mantissa
-	XCHG
-	SHLD	FMulInnerLoop+8	; Low two bytes of LHS mantissa
+	mov	a,c
+	sta	FMulInnerLoop+13 ; High byte of LHS mantissa
+	xchg
+	shld	FMulInnerLoop+8	; Low two bytes of LHS mantissa
 	; Initialize result mantissa to 0
-	LXI	BC,0
-	MOV	D,B
-	MOV	E,B
+	lxi	bc,0
+	mov	d,b
+	mov	e,b
 	; Set return address to FNormalise
-	LXI	HL,FNormaliseNoNeg
-	PUSH	HL
+	lxi	hl,FNormaliseNoNeg
+	push	hl
 	; Push outer loop address twice (for 3 bytes of mantissa)
-	LXI	HL,FMulOuterLoop
-	PUSH	HL
-	PUSH	HL
-	LXI	HL,FACCUM	; Point to RHS mantissa
+	lxi	hl,FMulOuterLoop
+	push	hl
+	push	hl
+	lxi	hl,FACCUM	; Point to RHS mantissa
 ; Outer loop: process one byte of RHS mantissa at a time
 FMulOuterLoop:
-	MOV	A,M		; Get RHS mantissa byte
-	INX	HL
-	PUSH	HL		; Save pointer
-	MVI	L,8		; 8 bits per byte
+	mov	a,m		; Get RHS mantissa byte
+	inx	hl
+	push	hl		; Save pointer
+	mvi	l,8		; 8 bits per byte
 ; Inner loop: shift-and-add for each bit
 FMulInnerLoop:
-	RAR			; Test low bit of RHS byte
-	MOV	H,A		; Save remaining bits
-	MOV	A,C		; A = result high byte
-	JNC	FMulNoAdd	; Skip add if bit was 0
+	rar			; Test low bit of RHS byte
+	mov	h,a		; Save remaining bits
+	mov	a,c		; A = result high byte
+	jnc	FMulNoAdd	; Skip add if bit was 0
 	; Add LHS mantissa to result
-	PUSH	HL
-	LXI	HL,0		; Self-modified: LHS low bytes
-	DAD	DE
-	POP	DE
-	ACI	0		; Self-modified: LHS high byte
-	XCHG
+	push	hl
+	lxi	hl,0		; Self-modified: LHS low bytes
+	dad	de
+	pop	de
+	aci	0		; Self-modified: LHS high byte
+	xchg
 FMulNoAdd:
-	CALL	FMantissaRtOnce+1 ; Shift result right
-	DCR	L		; Count bits
-	MOV	A,H		; Restore RHS byte
-	JNZ	FMulInnerLoop
+	call	FMantissaRtOnce+1 ; Shift result right
+	dcr	l		; Count bits
+	mov	a,h		; Restore RHS byte
+	jnz	FMulInnerLoop
 FMulReturn:
-	POP	HL		; Restore FACCUM pointer
-	RET			; Return (to outer loop or FNormalise)
+	pop	hl		; Restore FACCUM pointer
+	ret			; Return (to outer loop or FNormalise)
 ;-----------------------------------------------------------------------------
 ; FDivByTen - Divide FACCUM by 10.0
 ; Used in number output to bring values into range
 ;-----------------------------------------------------------------------------
 FDivByTen:
-	CALL	FPush		; Push FACCUM to stack
-	LXI	BC,8420H	; BCDE = 10.0 (exponent 84H, mantissa 20 00 00)
-	LXI	DE,0
-	CALL	FLoadFromBCDE	; Load 10.0 into FACCUM
+	call	FPush		; Push FACCUM to stack
+	lxi	bc,8420H	; BCDE = 10.0 (exponent 84H, mantissa 20 00 00)
+	lxi	de,0
+	call	FLoadFromBCDE	; Load 10.0 into FACCUM
 	; Fall into FDiv
 
 ;-----------------------------------------------------------------------------
@@ -2116,89 +2158,89 @@ FDivByTen:
 ; Uses repeated subtraction (long division) algorithm
 ;-----------------------------------------------------------------------------
 FDivEntry:
-	POP	BC		; Get LHS (dividend) from stack
-	POP	DE
-FDiv:	RST	5		; FTestSign - check if RHS (divisor) is zero
-	JZ	DivByZero	; Error if divide by zero
+	pop	bc		; Get LHS (dividend) from stack
+	pop	de
+FDiv:	rst	5		; FTestSign - check if RHS (divisor) is zero
+	jz	DivByZero	; Error if divide by zero
 	; Subtract exponents (L=FF means subtract)
-	MVI	L,0FFH
-	CALL	FExponentAdd
+	mvi	l,0FFH
+	call	FExponentAdd
 	; Multiply FACCUM by 4 (add 2 to exponent)
-	INR	M
-	INR	M
+	inr	m
+	inr	m
 	; Store RHS mantissa in self-modifying code locations
-	DCX	HL
-	MOV	A,M
-	STA	FDivLoop+12	; High byte
-	DCX	HL
-	MOV	A,M
-	STA	FDivLoop+8	; Middle byte
-	DCX	HL
-	MOV	A,M
-	STA	FDivLoop+4	; Low byte
+	dcx	hl
+	mov	a,m
+	sta	FDivLoop+12	; High byte
+	dcx	hl
+	mov	a,m
+	sta	FDivLoop+8	; Middle byte
+	dcx	hl
+	mov	a,m
+	sta	FDivLoop+4	; Low byte
 	; Initialize for long division
-	MOV	B,C		; B = LHS high mantissa byte
-	XCHG			; HL = LHS low mantissa
-	XRA	A
-	MOV	C,A		; Initialize result mantissa to 0
-	MOV	D,A
-	MOV	E,A
-	STA	FDivLoop+15	; Initialize carry byte
+	mov	b,c		; B = LHS high mantissa byte
+	xchg			; HL = LHS low mantissa
+	xra	a
+	mov	c,a		; Initialize result mantissa to 0
+	mov	d,a
+	mov	e,a
+	sta	FDivLoop+15	; Initialize carry byte
 ; Long division loop
 FDivLoop:
-	PUSH	HL		; Save dividend
-	PUSH	BC
+	push	hl		; Save dividend
+	push	bc
 	; Subtract divisor from dividend (self-modifying operands)
-	MOV	A,L
-	SUI	0		; Self-modified: divisor low byte
-	MOV	L,A
-	MOV	A,H
-	SBI	0		; Self-modified: divisor middle byte
-	MOV	H,A
-	MOV	A,B
-	SBI	0		; Self-modified: divisor high byte
-	MOV	B,A
-	MVI	A,0		; Self-modified: carry byte
-	SBI	0
-	CMC			; Complement carry for comparison
-	JNC	FDivNoSubtract
+	mov	a,l
+	sui	0		; Self-modified: divisor low byte
+	mov	l,a
+	mov	a,h
+	sbi	0		; Self-modified: divisor middle byte
+	mov	h,a
+	mov	a,b
+	sbi	0		; Self-modified: divisor high byte
+	mov	b,a
+	mvi	a,0		; Self-modified: carry byte
+	sbi	0
+	cmc			; Complement carry for comparison
+	jnc	FDivNoSubtract
 	; Subtraction succeeded - keep result
-	STA	FDivLoop+15	; Update carry
-	POP	PSW		; Discard old values
-	POP	PSW
-	STC			; Set carry for quotient bit
-	DB	0D2H		; JNC to skip restore (opcode only)
+	sta	FDivLoop+15	; Update carry
+	pop	psw		; Discard old values
+	pop	psw
+	stc			; Set carry for quotient bit
+	db	0D2H		; JNC to skip restore (opcode only)
 FDivNoSubtract:
-	POP	BC		; Restore original values
-	POP	HL
+	pop	bc		; Restore original values
+	pop	hl
 	; Shift quotient bit into result
-	MOV	A,C
-	INR	A		; Test if normalized
-	DCR	A
-	RAR			; Shift carry into result
-	JM	FRoundUp+1	; Done if normalized (skip MOV A,B)
-	RAL			; Undo the shift
-	CALL	FMantissaLeft	; Shift result left
+	mov	a,c
+	inr	a		; Test if normalized
+	dcr	a
+	rar			; Shift carry into result
+	jm	FRoundUp+1	; Done if normalized (skip MOV A,B)
+	ral			; Undo the shift
+	call	FMantissaLeft	; Shift result left
 	; Shift dividend left (multiply by 2)
-	DAD	HL
-	MOV	A,B
-	RAL
-	MOV	B,A
-	LDA	FDivLoop+15	; Shift carry byte
-	RAL
-	STA	FDivLoop+15
+	dad	hl
+	mov	a,b
+	ral
+	mov	b,a
+	lda	FDivLoop+15	; Shift carry byte
+	ral
+	sta	FDivLoop+15
 	; Check if dividend is zero
-	MOV	A,C
-	ORA	D
-	ORA	E
-	JNZ	FDivLoop
+	mov	a,c
+	ora	d
+	ora	e
+	jnz	FDivLoop
 	; Decrement exponent and continue
-	PUSH	HL
-	LXI	HL,FACCUM_EXP
-	DCR	M
-	POP	HL
-	JNZ	FDivLoop
-	JMP	Overflow	; Exponent underflow
+	push	hl
+	lxi	hl,FACCUM_EXP
+	dcr	m
+	pop	hl
+	jnz	FDivLoop
+	jmp	Overflow	; Exponent underflow
 ;-----------------------------------------------------------------------------
 ; FExponentAdd - Add or subtract exponents for FMul/FDiv
 ; Entry: L=0 for add (FMul), L=FF for subtract (FDiv)
@@ -2206,75 +2248,75 @@ FDivNoSubtract:
 ; Exit: Combined exponent stored in FACCUM, mantissas unpacked
 ;-----------------------------------------------------------------------------
 FExponentAdd:
-	MOV	A,B		; Check if LHS is zero
-	ORA	A
-	JZ	FExpAddZero	; Exit early if LHS is zero
-	MOV	A,L		; Get add/subtract flag
-	LXI	HL,FACCUM_EXP	; Point to RHS exponent
-	XRA	M		; XOR with RHS exponent (complement for subtract)
-	ADD	B		; Add LHS exponent
-	MOV	B,A
-	RAR			; Move carry to bit 7
-	XRA	B		; Check for overflow
-	MOV	A,B
-	JP	FExpAddStore	; No overflow, continue
+	mov	a,b		; Check if LHS is zero
+	ora	a
+	jz	FExpAddZero	; Exit early if LHS is zero
+	mov	a,l		; Get add/subtract flag
+	lxi	hl,FACCUM_EXP	; Point to RHS exponent
+	xra	m		; XOR with RHS exponent (complement for subtract)
+	add	b		; Add LHS exponent
+	mov	b,a
+	rar			; Move carry to bit 7
+	xra	b		; Check for overflow
+	mov	a,b
+	jp	FExpAddStore	; No overflow, continue
 	; Add bias and store exponent
-	ADI	80H		; Add bias
-	MOV	M,A		; Store in FACCUM
-	JZ	FMulReturn	; Zero = underflow, exit via POP HL; RET
+	adi	80H		; Add bias
+	mov	m,a		; Store in FACCUM
+	jz	FMulReturn	; Zero = underflow, exit via POP HL; RET
 	; Unpack mantissas and store sign
-	CALL	FUnpackMantissas
-	MOV	M,A		; Store sign relationship
-	DCX	HL		; Point to mantissa high byte
-	RET
+	call	FUnpackMantissas
+	mov	m,a		; Store sign relationship
+	dcx	hl		; Point to mantissa high byte
+	ret
 FExpAddStore:
-	ORA	A		; Set flags
+	ora	a		; Set flags
 FExpAddZero:
-	POP	HL		; Remove return address
-	JM	Overflow	; Negative = overflow error
+	pop	hl		; Remove return address
+	jm	Overflow	; Negative = overflow error
 ; Fall into FZero
 
 ;-----------------------------------------------------------------------------
 ; FZero - Set FACCUM to zero
 ;-----------------------------------------------------------------------------
-FZero:	XRA	A
-	STA	FACCUM_EXP	; Zero exponent = zero value
-	RET
+FZero:	xra	a
+	sta	FACCUM_EXP	; Zero exponent = zero value
+	ret
 ;-----------------------------------------------------------------------------
 ; FMulByTen - Multiply FACCUM by 10.0 (optimized)
 ; Uses: FACCUM * 10 = (FACCUM * 4 + FACCUM) * 2
 ;-----------------------------------------------------------------------------
 FMulByTen:
-	CALL	FCopyToBCDE	; Copy FACCUM to BCDE
-	MOV	A,B		; Check if zero
-	ORA	A
-	RZ			; Return if zero
-	ADI	2		; Multiply by 4 (add 2 to exponent)
-	JC	Overflow	; Check overflow
-	MOV	B,A
-	CALL	FAdd		; Add to FACCUM (now FACCUM*5)
-	LXI	HL,FACCUM_EXP	; Multiply by 2 (add 1 to exponent)
-	INR	M
-	RNZ
-	JMP	Overflow
+	call	FCopyToBCDE	; Copy FACCUM to BCDE
+	mov	a,b		; Check if zero
+	ora	a
+	rz			; Return if zero
+	adi	2		; Multiply by 4 (add 2 to exponent)
+	jc	Overflow	; Check overflow
+	mov	b,a
+	call	FAdd		; Add to FACCUM (now FACCUM*5)
+	lxi	hl,FACCUM_EXP	; Multiply by 2 (add 1 to exponent)
+	inr	m
+	rnz
+	jmp	Overflow
 
 ;-----------------------------------------------------------------------------
 ; FTestSign_tail - Continuation of RST 5 (FTestSign)
 ; Returns: A=0 if FACCUM=0, A=1 if positive, A=-1 if negative
 ;-----------------------------------------------------------------------------
 FTestSign_tail:
-	LDA	FACCUM+2	; Get sign byte
-	CPI	2FH		; Compare to determine sign
-	RAL			; Rotate sign into carry
-	SBB	A		; A = -1 if negative, 0 if positive
-	RNZ			; Return if non-zero (negative)
-	INR	A		; Return 1 for positive
-	RET
+	lda	FACCUM+2	; Get sign byte
+	cpi	2FH		; Compare to determine sign
+	ral			; Rotate sign into carry
+	sbb	a		; A = -1 if negative, 0 if positive
+	rnz			; Return if non-zero (negative)
+	inr	a		; Return 1 for positive
+	ret
 
 ;-----------------------------------------------------------------------------
 ; Sgn - SGN function: returns -1, 0, or 1 based on sign of FACCUM
 ;-----------------------------------------------------------------------------
-Sgn:	RST	5		; FTestSign
+Sgn:	rst	5		; FTestSign
 ; Fall through to convert result to float
 
 ;-----------------------------------------------------------------------------
@@ -2283,100 +2325,100 @@ Sgn:	RST	5		; FTestSign
 ; Exit: Result in FACCUM
 ;-----------------------------------------------------------------------------
 FCharToFloat:
-	MVI	B,88H		; Exponent for 8-bit integer
-	LXI	DE,0		; Low mantissa bytes = 0
+	mvi	b,88H		; Exponent for 8-bit integer
+	lxi	de,0		; Low mantissa bytes = 0
 FCharToFloat2:
-	LXI	HL,FACCUM_EXP	; Point to exponent
-	MOV	C,A		; C = mantissa high byte
-	MOV	M,B		; Store exponent
-	MVI	B,0		; B = 0 (extra precision)
-	INX	HL
-	MVI	M,80H		; Set implicit high bit
-	RAL			; Get sign bit into carry
-	JMP	FNormalise	; Normalize result
+	lxi	hl,FACCUM_EXP	; Point to exponent
+	mov	c,a		; C = mantissa high byte
+	mov	m,b		; Store exponent
+	mvi	b,0		; B = 0 (extra precision)
+	inx	hl
+	mvi	m,80H		; Set implicit high bit
+	ral			; Get sign bit into carry
+	jmp	FNormalise	; Normalize result
 
 ;-----------------------------------------------------------------------------
 ; Abs - ABS function: absolute value
 ;-----------------------------------------------------------------------------
-Abs:	RST	5		; FTestSign
-	RP			; Return if positive or zero
+Abs:	rst	5		; FTestSign
+	rp			; Return if positive or zero
 ; Fall into FNegate
 
 ;-----------------------------------------------------------------------------
 ; FNegate - Negate FACCUM (flip sign bit)
 ;-----------------------------------------------------------------------------
 FNegate:
-	LXI	HL,FACCUM+2	; Point to sign byte
-	MOV	A,M
-	XRI	80H		; Flip sign bit
-	MOV	M,A
-	RET
+	lxi	hl,FACCUM+2	; Point to sign byte
+	mov	a,m
+	xri	80H		; Flip sign bit
+	mov	m,a
+	ret
 
 ;-----------------------------------------------------------------------------
 ; FPush - Push FACCUM onto stack
 ; Preserves return address, pushes FACCUM as 2 words (BCDE format)
 ;-----------------------------------------------------------------------------
-FPush:	XCHG			; Save DE
-	LHLD	FACCUM		; Get low 2 bytes
-	XTHL			; Swap with return address
-	PUSH	HL		; Push return address
-	LHLD	FACCUM+2	; Get high 2 bytes (mantissa high + exponent)
-	XTHL			; Swap with return address (now on stack)
-	PUSH	HL		; Push high 2 bytes
-	XCHG			; Restore DE
-	RET
+FPush:	xchg			; Save DE
+	lhld	FACCUM		; Get low 2 bytes
+	xthl			; Swap with return address
+	push	hl		; Push return address
+	lhld	FACCUM+2	; Get high 2 bytes (mantissa high + exponent)
+	xthl			; Swap with return address (now on stack)
+	push	hl		; Push high 2 bytes
+	xchg			; Restore DE
+	ret
 
 ;-----------------------------------------------------------------------------
 ; FLoadFromMem - Load FACCUM from memory
 ; Entry: HL = pointer to 4-byte float
 ;-----------------------------------------------------------------------------
 FLoadFromMem:
-	CALL	FLoadBCDEfromMem ; Load BCDE from memory
+	call	FLoadBCDEfromMem ; Load BCDE from memory
 ; Fall into FLoadFromBCDE
 
 ;-----------------------------------------------------------------------------
 ; FLoadFromBCDE - Load FACCUM from BCDE
 ;-----------------------------------------------------------------------------
 FLoadFromBCDE:
-	XCHG			; HL = low mantissa
-	SHLD	FACCUM		; Store low mantissa
-	MOV	H,B		; HL = exponent/high mantissa
-	MOV	L,C
-	SHLD	FACCUM+2	; Store high mantissa and exponent
-	XCHG			; Restore HL
-	RET
+	xchg			; HL = low mantissa
+	shld	FACCUM		; Store low mantissa
+	mov	h,b		; HL = exponent/high mantissa
+	mov	l,c
+	shld	FACCUM+2	; Store high mantissa and exponent
+	xchg			; Restore HL
+	ret
 
 ;-----------------------------------------------------------------------------
 ; FCopyToBCDE - Copy FACCUM to BCDE registers
 ;-----------------------------------------------------------------------------
 FCopyToBCDE:
-	LXI	HL,FACCUM	; Point to mantissa
+	lxi	hl,FACCUM	; Point to mantissa
 FLoadBCDEfromMem:
-	MOV	E,M		; E = low mantissa byte
-	INX	HL
-	MOV	D,M		; D = middle mantissa byte
-	INX	HL
-	MOV	C,M		; C = high mantissa byte (with sign)
-	INX	HL
-	MOV	B,M		; B = exponent
+	mov	e,m		; E = low mantissa byte
+	inx	hl
+	mov	d,m		; D = middle mantissa byte
+	inx	hl
+	mov	c,m		; C = high mantissa byte (with sign)
+	inx	hl
+	mov	b,m		; B = exponent
 IncHL:
-	INX	HL
-	RET
+	inx	hl
+	ret
 ;-----------------------------------------------------------------------------
 ; FCopyToMem - Copy FACCUM to memory location
 ; Entry: HL = destination pointer
 ;-----------------------------------------------------------------------------
 FCopyToMem:
-	LXI	DE,FACCUM	; Source = FACCUM mantissa
-	MVI	B,4		; 4 bytes to copy
+	lxi	de,FACCUM	; Source = FACCUM mantissa
+	mvi	b,4		; 4 bytes to copy
 FCopyLoop:
-	LDAX	DE
-	MOV	M,A
-	INX	DE
-	INX	HL
-	DCR	B
-	JNZ	FCopyLoop
-	RET
+	ldax	de
+	mov	m,a
+	inx	de
+	inx	hl
+	dcr	b
+	jnz	FCopyLoop
+	ret
 
 ;-----------------------------------------------------------------------------
 ; FUnpackMantissas - Unpack mantissas for arithmetic operations
@@ -2386,26 +2428,26 @@ FCopyLoop:
 ;       C, FACCUM mantissas have implicit bit set
 ;-----------------------------------------------------------------------------
 FUnpackMantissas:
-	LXI	HL,FACCUM+2	; Point to RHS sign byte
-	MOV	A,M		; Get RHS sign
-	RLC			; Rotate sign to carry
-	STC			; Set carry (implicit high bit)
-	RAR			; Combine: bit 7=1, bit 6=old sign
-	MOV	M,A		; Store back
-	CMC			; Complement for sign extraction
-	RAR			; A = sign indicator
-	INX	HL		; Skip to FTEMP_SIGN
-	INX	HL
-	MOV	M,A		; Store sign indicator
+	lxi	hl,FACCUM+2	; Point to RHS sign byte
+	mov	a,m		; Get RHS sign
+	rlc			; Rotate sign to carry
+	stc			; Set carry (implicit high bit)
+	rar			; Combine: bit 7=1, bit 6=old sign
+	mov	m,a		; Store back
+	cmc			; Complement for sign extraction
+	rar			; A = sign indicator
+	inx	hl		; Skip to FTEMP_SIGN
+	inx	hl
+	mov	m,a		; Store sign indicator
 	; Same for LHS mantissa in C
-	MOV	A,C
-	RLC			; Get sign to carry
-	STC			; Set implicit bit
-	RAR			; Bit 7 = 1, bit 6 = old sign
-	MOV	C,A
-	RAR			; Get sign for comparison
-	XRA	M		; XOR with RHS sign
-	RET			; A positive = same sign, negative = different
+	mov	a,c
+	rlc			; Get sign to carry
+	stc			; Set implicit bit
+	rar			; Bit 7 = 1, bit 6 = old sign
+	mov	c,a
+	rar			; Get sign for comparison
+	xra	m		; XOR with RHS sign
+	ret			; A positive = same sign, negative = different
 ;-----------------------------------------------------------------------------
 ; FCompare - Compare BCDE with FACCUM
 ; Entry: BCDE = number to compare
@@ -2413,94 +2455,94 @@ FUnpackMantissas:
 ;       Zero flag set if equal
 ;-----------------------------------------------------------------------------
 FCompareWithBCDE:
-	MOV	A,B		; Check if BCDE is zero
-	ORA	A
-	JZ	FTestSign	; If zero, result depends on FACCUM sign
-	LXI	HL,FTestSign_tail+4 ; Return address for sign check (into CPI's operand)
-	PUSH	HL
-	RST	5		; FTestSign - check FACCUM
-	MOV	A,C		; Get BCDE sign
-	RZ			; Return if FACCUM is zero
-	LXI	HL,FACCUM+2	; Compare signs
-	XRA	M
-	MOV	A,C
-	RM			; Different signs - return sign of BCDE
-	CALL	FCompareBytes	; Same sign - compare magnitudes
-	RAR			; Move result to low bit
-	XRA	C		; Adjust for sign
-	RET
+	mov	a,b		; Check if BCDE is zero
+	ora	a
+	jz	FTestSign	; If zero, result depends on FACCUM sign
+	lxi	hl,FTestSign_tail+4 ; Return address for sign check (into CPI's operand)
+	push	hl
+	rst	5		; FTestSign - check FACCUM
+	mov	a,c		; Get BCDE sign
+	rz			; Return if FACCUM is zero
+	lxi	hl,FACCUM+2	; Compare signs
+	xra	m
+	mov	a,c
+	rm			; Different signs - return sign of BCDE
+	call	FCompareBytes	; Same sign - compare magnitudes
+	rar			; Move result to low bit
+	xra	c		; Adjust for sign
+	ret
 
 ; Compare bytes of BCDE with FACCUM
 FCompareBytes:
-	INX	HL		; Point to exponent
-	MOV	A,B		; Compare exponents
-	CMP	M
-	RNZ
-	DCX	HL		; Compare high mantissa
-	MOV	A,C
-	CMP	M
-	RNZ
-	DCX	HL		; Compare middle mantissa
-	MOV	A,D
-	CMP	M
-	RNZ
-	DCX	HL		; Compare low mantissa
-	MOV	A,E
-	SUB	M
-	RNZ
-	POP	HL		; Equal - discard return addresses
-	POP	HL
-	RET
+	inx	hl		; Point to exponent
+	mov	a,b		; Compare exponents
+	cmp	m
+	rnz
+	dcx	hl		; Compare high mantissa
+	mov	a,c
+	cmp	m
+	rnz
+	dcx	hl		; Compare middle mantissa
+	mov	a,d
+	cmp	m
+	rnz
+	dcx	hl		; Compare low mantissa
+	mov	a,e
+	sub	m
+	rnz
+	pop	hl		; Equal - discard return addresses
+	pop	hl
+	ret
 
 ;-----------------------------------------------------------------------------
 ; FCompare - Convert FACCUM to integer in BCDE for comparison
 ; Used by INT function and comparisons
 ;-----------------------------------------------------------------------------
 FCompare:
-	MOV	B,A		; Initialize BCDE to 0
-	MOV	C,A
-	MOV	D,A
-	MOV	E,A
-	ORA	A
-	RZ			; Return if FACCUM is zero
-	PUSH	HL
-	CALL	FCopyToBCDE	; Copy FACCUM to BCDE
-	CALL	FUnpackMantissas ; Unpack mantissa
-	XRA	M		; Get sign relationship
-	MOV	H,A
-	CM	FCompareNeg	; Negate if needed
-	MVI	A,98H		; 24-bit integer exponent
-	SUB	B		; Calculate shift count
-	CALL	FMantissaRtMult	; Shift to integer
-	MOV	A,H
-	RAL			; Check sign
-	CC	FMantissaInc	; Round up if needed
-	MVI	B,0
-	CC	FNegateInt	; Negate if negative
-	POP	HL
-	RET
+	mov	b,a		; Initialize BCDE to 0
+	mov	c,a
+	mov	d,a
+	mov	e,a
+	ora	a
+	rz			; Return if FACCUM is zero
+	push	hl
+	call	FCopyToBCDE	; Copy FACCUM to BCDE
+	call	FUnpackMantissas ; Unpack mantissa
+	xra	m		; Get sign relationship
+	mov	h,a
+	cm	FCompareNeg	; Negate if needed
+	mvi	a,98H		; 24-bit integer exponent
+	sub	b		; Calculate shift count
+	call	FMantissaRtMult	; Shift to integer
+	mov	a,h
+	ral			; Check sign
+	cc	FMantissaInc	; Round up if needed
+	mvi	b,0
+	cc	FNegateInt	; Negate if negative
+	pop	hl
+	ret
 
 FCompareNeg:
-	DCX	DE		; Decrement for negate
-	MOV	A,D
-	ANA	E
-	INR	A
-	RNZ
-	DCX	BC
-	RET
+	dcx	de		; Decrement for negate
+	mov	a,d
+	ana	e
+	inr	a
+	rnz
+	dcx	bc
+	ret
 
 ;-----------------------------------------------------------------------------
 ; Int - INT function: truncate to integer
 ;-----------------------------------------------------------------------------
-Int:	LXI	HL,FACCUM_EXP	; Point to exponent
-	MOV	A,M
-	CPI	98H		; Check if already integer
-	RNC			; Return if exponent >= 24 bits
-	CALL	FCompare	; Convert to integer in BCDE
-	MVI	M,98H		; Set exponent for integer
-	MOV	A,C		; Get sign
-	RAL			; Rotate sign to carry
-	JMP	FNormalise	; Normalize result
+Int:	lxi	hl,FACCUM_EXP	; Point to exponent
+	mov	a,m
+	cpi	98H		; Check if already integer
+	rnc			; Return if exponent >= 24 bits
+	call	FCompare	; Convert to integer in BCDE
+	mvi	m,98H		; Set exponent for integer
+	mov	a,c		; Get sign
+	ral			; Rotate sign to carry
+	jmp	FNormalise	; Normalize result
 ;-----------------------------------------------------------------------------
 ; FIn - Read ASCII string and convert to floating point in FACCUM
 ; Input: HL points to before the number string
@@ -2512,566 +2554,566 @@ Int:	LXI	HL,FACCUM_EXP	; Point to exponent
 ;-----------------------------------------------------------------------------
 FIn:
 FInInit:
-	DCX	HL		; Point to just before number
-	CALL	FZero		; Clear FACCUM
-	MOV	B,A		; B = 0 (fractional digit count)
-	MOV	D,A		; D = 0 (exponent sign)
-	MOV	E,A		; E = 0 (exponent value)
-	CMA			; A = 0xFF
-	MOV	C,A		; C = 0xFF (no decimal point yet)
+	dcx	hl		; Point to just before number
+	call	FZero		; Clear FACCUM
+	mov	b,a		; B = 0 (fractional digit count)
+	mov	d,a		; D = 0 (exponent sign)
+	mov	e,a		; E = 0 (exponent value)
+	cma			; A = 0xFF
+	mov	c,a		; C = 0xFF (no decimal point yet)
 ; Main parsing loop - process one character at a time
 FInCharLoop:
-	RST	2		; NextChar - get next character
-	JC	FInDigit	; If digit, process it
-	CPI	2EH		; Decimal point?
-	JZ	FInDecPt	; Yes, mark decimal point seen
-	CPI	45H		; 'E' for exponent?
-	JNZ	FInScale	; No, done parsing - scale result
+	rst	2		; NextChar - get next character
+	jc	FInDigit	; If digit, process it
+	cpi	2EH		; Decimal point?
+	jz	FInDecPt	; Yes, mark decimal point seen
+	cpi	45H		; 'E' for exponent?
+	jnz	FInScale	; No, done parsing - scale result
 	; Process exponent after 'E'
-	RST	2		; NextChar - get sign or first digit
-	DCR	D		; Assume negative (D = -1)
-	CPI	99H		; Minus token?
-	JZ	FInExpDigit	; Yes, keep D = -1
-	INR	D		; No, restore D = 0
-	CPI	98H		; Plus token?
-	JZ	FInExpDigit	; Yes, D = 0 (positive)
-	DCX	HL		; Back up to re-read char
+	rst	2		; NextChar - get sign or first digit
+	dcr	d		; Assume negative (D = -1)
+	cpi	99H		; Minus token?
+	jz	FInExpDigit	; Yes, keep D = -1
+	inr	d		; No, restore D = 0
+	cpi	98H		; Plus token?
+	jz	FInExpDigit	; Yes, D = 0 (positive)
+	dcx	hl		; Back up to re-read char
 FInExpDigit:
-	RST	2		; NextChar - get exponent digit
-	JC	FInExpAccum	; If digit, accumulate exponent
-	INR	D		; D was -1? (negative exponent)
-	JNZ	FInScale	; No, done with exponent
+	rst	2		; NextChar - get exponent digit
+	jc	FInExpAccum	; If digit, accumulate exponent
+	inr	d		; D was -1? (negative exponent)
+	jnz	FInScale	; No, done with exponent
 	; Negate exponent for negative
-	XRA	A
-	SUB	E		; E = -E
-	MOV	E,A
-	INR	C		; Reset C (was 0xFF)
+	xra	a
+	sub	e		; E = -E
+	mov	e,a
+	inr	c		; Reset C (was 0xFF)
 FInDecPt:
-	INR	C		; Mark decimal point seen (C = 0)
-	JZ	FInCharLoop	; Continue if first decimal point
+	inr	c		; Mark decimal point seen (C = 0)
+	jz	FInCharLoop	; Continue if first decimal point
 ; Scale the result by 10^(E-B) where E=exponent, B=fractional digits
 FInScale:
-	PUSH	HL		; Save program pointer
-	MOV	A,E		; A = exponent
-	SUB	B		; A = exponent - fractional digits
+	push	hl		; Save program pointer
+	mov	a,e		; A = exponent
+	sub	b		; A = exponent - fractional digits
 FInScaleLoop:
-	CP	FInMulTen	; If positive, multiply by 10
-	JP	FInScaleEnd	; Check if done
+	cp	FInMulTen	; If positive, multiply by 10
+	jp	FInScaleEnd	; Check if done
 	; Negative - divide by 10
-	PUSH	PSW
-	CALL	FDivByTen
-	POP	PSW
-	INR	A		; Move toward zero
+	push	psw
+	call	FDivByTen
+	pop	psw
+	inr	a		; Move toward zero
 FInScaleEnd:
-	JNZ	FInScaleLoop	; Continue until A = 0
-	POP	HL		; Restore program pointer
-	RET
+	jnz	FInScaleLoop	; Continue until A = 0
+	pop	hl		; Restore program pointer
+	ret
 ; Multiply by 10 helper (for positive scaling)
 FInMulTen:
-	RZ			; Return if A = 0
-	PUSH	PSW
-	CALL	FMulByTen
-	POP	PSW
-	DCR	A		; Move toward zero
-	RET
+	rz			; Return if A = 0
+	push	psw
+	call	FMulByTen
+	pop	psw
+	dcr	a		; Move toward zero
+	ret
 ; Process a digit: multiply current value by 10, add digit
 FInDigit:
-	PUSH	DE		; Save exponent info
-	MOV	D,A		; D = digit character
-	MOV	A,B		; Update fractional count
-	ADC	C		; Add with carry (C = 0 after decimal)
-	MOV	B,A
-	PUSH	BC		; Save BC
-	PUSH	HL		; Save program pointer
-	PUSH	DE		; Save digit
-	CALL	FMulByTen	; FACCUM *= 10
-	POP	PSW		; Get digit back in A
-	SUI	30H		; Convert ASCII to value
-	CALL	FPush		; Save current FACCUM
-	CALL	FCharToFloat	; Convert digit to float
-	POP	BC		; Get old FACCUM
-	POP	DE
-	CALL	FAdd		; Add digit to total
-	POP	HL		; Restore program pointer
-	POP	BC		; Restore BC
-	POP	DE		; Restore exponent info
-	JMP	FInCharLoop	; Continue parsing
+	push	de		; Save exponent info
+	mov	d,a		; D = digit character
+	mov	a,b		; Update fractional count
+	adc	c		; Add with carry (C = 0 after decimal)
+	mov	b,a
+	push	bc		; Save BC
+	push	hl		; Save program pointer
+	push	de		; Save digit
+	call	FMulByTen	; FACCUM *= 10
+	pop	psw		; Get digit back in A
+	sui	30H		; Convert ASCII to value
+	call	FPush		; Save current FACCUM
+	call	FCharToFloat	; Convert digit to float
+	pop	bc		; Get old FACCUM
+	pop	de
+	call	FAdd		; Add digit to total
+	pop	hl		; Restore program pointer
+	pop	bc		; Restore BC
+	pop	de		; Restore exponent info
+	jmp	FInCharLoop	; Continue parsing
 ; Accumulate exponent digit: E = E*10 + digit
 FInExpAccum:
-	MOV	A,E		; A = current exponent
-	RLC			; A = E*2
-	RLC			; A = E*4
-	ADD	E		; A = E*5
-	RLC			; A = E*10
-	ADD	M		; Add digit character
-	SUI	30H		; Convert from ASCII
-	MOV	E,A		; Store back
-	JMP	FInExpDigit	; Continue reading exponent
+	mov	a,e		; A = current exponent
+	rlc			; A = E*2
+	rlc			; A = E*4
+	add	e		; A = E*5
+	rlc			; A = E*10
+	add	m		; Add digit character
+	sui	30H		; Convert from ASCII
+	mov	e,a		; Store back
+	jmp	FInExpDigit	; Continue reading exponent
 ;-----------------------------------------------------------------------------
 ; PrintIN - Print " IN " followed by line number (for error messages)
 ;-----------------------------------------------------------------------------
 PrintIN:
-	PUSH	HL
-	LXI	HL,szIn		; " IN " string
-	CALL	PrintString+1	; Skip INX HL
-	POP	HL
+	push	hl
+	lxi	hl,szIn		; " IN " string
+	call	PrintString+1	; Skip INX HL
+	pop	hl
 ;-----------------------------------------------------------------------------
 ; PrintInt - Print integer in HL (converts to float and prints)
 ; The integer occupies the lower 16 bits of mantissa with exponent=24
 ;-----------------------------------------------------------------------------
 PrintInt:
-	XCHG			; DE = integer value
-	XRA	A		; C = 0
-	MVI	B,98H		; B = exponent 24 (2^24)
-	CALL	FCharToFloat+5	; Convert to float (skip sign handling)
-	LXI	HL,PrintString	; Return to PrintString after FOut
-	PUSH	HL
+	xchg			; DE = integer value
+	xra	a		; C = 0
+	mvi	b,98H		; B = exponent 24 (2^24)
+	call	FCharToFloat+5	; Convert to float (skip sign handling)
+	lxi	hl,PrintString	; Return to PrintString after FOut
+	push	hl
 ;-----------------------------------------------------------------------------
 ; FOut - Float Output: Convert FACCUM to ASCII string in FBUFFER
 ; Output string is then printed by returning to PrintString
 ;-----------------------------------------------------------------------------
 FOut:
 FOutStart:
-	LXI	HL,FBUFFER	; Output buffer
-	PUSH	HL
-	RST	5		; FTestSign - check FACCUM sign
-	MVI	M,20H		; Assume positive: leading space
-	JP	FOutSetZero	; If positive, skip
-	MVI	M,2DH		; Negative: leading '-'
+	lxi	hl,FBUFFER	; Output buffer
+	push	hl
+	rst	5		; FTestSign - check FACCUM sign
+	mvi	m,20H		; Assume positive: leading space
+	jp	FOutSetZero	; If positive, skip
+	mvi	m,2DH		; Negative: leading '-'
 FOutSetZero:
-	INX	HL
-	MVI	M,30H		; Write '0' (for zero case)
-	JZ	FOut_tail	; If zero, done (just " 0")
+	inx	hl
+	mvi	m,30H		; Write '0' (for zero case)
+	jz	FOut_tail	; If zero, done (just " 0")
 	; Make FACCUM positive for processing
-	PUSH	HL		; Save buffer position
-	CM	FNegate		; Negate if negative
-	XRA	A		; Initialize decimal exponent adjustment = 0
-	PUSH	PSW
-	CALL	FOutUnder1M	; Ensure FACCUM < 1,000,000
+	push	hl		; Save buffer position
+	cm	FNegate		; Negate if negative
+	xra	a		; Initialize decimal exponent adjustment = 0
+	push	psw
+	call	FOutUnder1M	; Ensure FACCUM < 1,000,000
 ; Loop to bring FACCUM >= 100,000
 FOutOver100K:
-	LXI	BC,9143H	; BCDE = 100000.0
-	LXI	DE,4FF8H
-	CALL	FCompareWithBCDE
-	JPO	FOutPrepare	; If FACCUM >= 100000, continue
-	POP	PSW		; Get decimal exponent adjustment
-	CALL	FInMulTen+1	; Multiply by 10, decrement adjustment (skip RZ)
-	PUSH	PSW
-	JMP	FOutOver100K
+	lxi	bc,9143H	; BCDE = 100000.0
+	lxi	de,4FF8H
+	call	FCompareWithBCDE
+	jpo	FOutPrepare	; If FACCUM >= 100000, continue
+	pop	psw		; Get decimal exponent adjustment
+	call	FInMulTen+1	; Multiply by 10, decrement adjustment (skip RZ)
+	push	psw
+	jmp	FOutOver100K
 ; Divide by 10 and increment exponent adjustment
 FOutDiv10:
-	CALL	FDivByTen
-	POP	PSW
-	INR	A		; Increment decimal exponent
-	PUSH	PSW
-	CALL	FOutUnder1M	; Check if under 1M again
+	call	FDivByTen
+	pop	psw
+	inr	a		; Increment decimal exponent
+	push	psw
+	call	FOutUnder1M	; Check if under 1M again
 ; FACCUM is now between 100,000 and 1,000,000
 ; Add 0.5 for rounding and convert to integer
 FOutPrepare:
-	CALL	FAddMem		; Add 0.5 (ONE_HALF)
-	INR	A
-	CALL	FCompare	; Convert to integer in CDE
-	CALL	FLoadFromBCDE	; Store integer back to FACCUM
+	call	FAddMem		; Add 0.5 (ONE_HALF)
+	inr	a
+	call	FCompare	; Convert to integer in CDE
+	call	FLoadFromBCDE	; Store integer back to FACCUM
 	; Determine output format (scientific or normal)
-	LXI	BC,0206H	; B=2, C=6 (6 digits)
-	POP	PSW		; A = decimal exponent adjustment
-	ADD	C		; A = adjustment + 6
-	JM	FOutUseExp	; If A < 0, use scientific
-	CPI	07H
-	JNC	FOutUseExp	; If A >= 7, use scientific
-	INR	A		; Use normal format
-	MOV	B,A		; B = decimal point position
-	MVI	A,01H		; A=1 means no exponent output
+	lxi	bc,0206H	; B=2, C=6 (6 digits)
+	pop	psw		; A = decimal exponent adjustment
+	add	c		; A = adjustment + 6
+	jm	FOutUseExp	; If A < 0, use scientific
+	cpi	07H
+	jnc	FOutUseExp	; If A >= 7, use scientific
+	inr	a		; Use normal format
+	mov	b,a		; B = decimal point position
+	mvi	a,01H		; A=1 means no exponent output
 FOutUseExp:
-	DCR	A
-	POP	HL		; HL = output buffer
-	PUSH	PSW		; Save exponent flag
-	LXI	DE,DECIMAL_POWERS ; Table of 100000, 10000, 1000...
+	dcr	a
+	pop	hl		; HL = output buffer
+	push	psw		; Save exponent flag
+	lxi	de,DECIMAL_POWERS ; Table of 100000, 10000, 1000...
 ; Output each digit by repeated subtraction
 FOutDigitLoop:
-	DCR	B		; Decrement decimal point counter
-	MVI	M,2EH		; Write '.' (may be overwritten)
-	CZ	IncHL		; If B=0, actually keep the '.'
-	PUSH	BC
-	PUSH	HL
-	PUSH	DE
-	CALL	FCopyToBCDE	; Get FACCUM to BCDE
-	POP	HL		; HL points to power of 10 table
-	MVI	B,2FH		; B = '0' - 1
+	dcr	b		; Decrement decimal point counter
+	mvi	m,2EH		; Write '.' (may be overwritten)
+	cz	IncHL		; If B=0, actually keep the '.'
+	push	bc
+	push	hl
+	push	de
+	call	FCopyToBCDE	; Get FACCUM to BCDE
+	pop	hl		; HL points to power of 10 table
+	mvi	b,2FH		; B = '0' - 1
 ; Subtract power of 10 until underflow
 FOutSubLoop:
-	INR	B		; Increment digit
-	MOV	A,E		; Subtract 3-byte power from CDE
-	SUB	M
-	MOV	E,A
-	INX	HL
-	MOV	A,D
-	SBB	M
-	MOV	D,A
-	INX	HL
-	MOV	A,C
-	SBB	M
-	MOV	C,A
-	DCX	HL
-	DCX	HL
-	JNC	FOutSubLoop	; Continue until underflow
-	CALL	FAddMantissas	; Add back (undo last subtraction)
-	INX	HL		; Move to next power
-	CALL	FLoadFromBCDE	; Store result back
-	XCHG			; DE = power table ptr
-	POP	HL		; HL = output buffer
-	MOV	M,B		; Store digit
-	INX	HL
-	POP	BC
-	DCR	C		; More digits?
-	JNZ	FOutDigitLoop	; Yes, continue
+	inr	b		; Increment digit
+	mov	a,e		; Subtract 3-byte power from CDE
+	sub	m
+	mov	e,a
+	inx	hl
+	mov	a,d
+	sbb	m
+	mov	d,a
+	inx	hl
+	mov	a,c
+	sbb	m
+	mov	c,a
+	dcx	hl
+	dcx	hl
+	jnc	FOutSubLoop	; Continue until underflow
+	call	FAddMantissas	; Add back (undo last subtraction)
+	inx	hl		; Move to next power
+	call	FLoadFromBCDE	; Store result back
+	xchg			; DE = power table ptr
+	pop	hl		; HL = output buffer
+	mov	m,b		; Store digit
+	inx	hl
+	pop	bc
+	dcr	c		; More digits?
+	jnz	FOutDigitLoop	; Yes, continue
 	; Strip trailing zeros
-	DCR	B
-	JZ	FOutExpPart	; Skip if no trailing zeros
+	dcr	b
+	jz	FOutExpPart	; Skip if no trailing zeros
 FOutStripZeros:
-	DCX	HL
-	MOV	A,M
-	CPI	30H		; '0'?
-	JZ	FOutStripZeros	; Strip it
-	CPI	2EH		; Decimal point?
-	CNZ	IncHL		; If not '.', keep this char
+	dcx	hl
+	mov	a,m
+	cpi	30H		; '0'?
+	jz	FOutStripZeros	; Strip it
+	cpi	2EH		; Decimal point?
+	cnz	IncHL		; If not '.', keep this char
 FOutExpPart:
-	POP	PSW		; Get exponent flag
-	JZ	FOutNullTerm	; If 0, no exponent needed
+	pop	psw		; Get exponent flag
+	jz	FOutNullTerm	; If 0, no exponent needed
 	; Write scientific notation exponent
-	MVI	M,45H		; 'E'
-	INX	HL
-	MVI	M,2BH		; Assume '+'
-	JP	FOutExpDigits	; If positive exponent
-	MVI	M,2DH		; Negative: '-'
-	CMA			; Negate exponent
-	INR	A
+	mvi	m,45H		; 'E'
+	inx	hl
+	mvi	m,2BH		; Assume '+'
+	jp	FOutExpDigits	; If positive exponent
+	mvi	m,2DH		; Negative: '-'
+	cma			; Negate exponent
+	inr	a
 FOutExpDigits:
-	MVI	B,2FH		; B = '0' - 1
+	mvi	b,2FH		; B = '0' - 1
 FOutExpLoop:
-	INR	B		; Count tens digit
-	SUI	0AH
-	JNC	FOutExpLoop
-	ADI	3AH		; A = ones digit + '0'
-	INX	HL
-	MOV	M,B		; Store tens digit
+	inr	b		; Count tens digit
+	sui	0AH
+	jnc	FOutExpLoop
+	adi	3AH		; A = ones digit + '0'
+	inx	hl
+	mov	m,b		; Store tens digit
 FOut_tail:
-	INX	HL
-	MOV	M,A		; Store ones digit
-	INX	HL
+	inx	hl
+	mov	m,a		; Store ones digit
+	inx	hl
 FOutNullTerm:
-	MOV	M,C		; Null terminator (C=0)
-	POP	HL		; Return buffer pointer
-	RET
+	mov	m,c		; Null terminator (C=0)
+	pop	hl		; Return buffer pointer
+	ret
 ;-----------------------------------------------------------------------------
 ; FOutUnder1M - Ensure FACCUM < 1,000,000 by dividing by 10
 ;-----------------------------------------------------------------------------
 FOutUnder1M:
-	LXI	BC,9474H	; BCDE = 1000000.0
-	LXI	DE,23F7H
-	CALL	FCompareWithBCDE
-	POP	HL		; Get return address
-	JPO	FOutDiv10	; If >= 1M, divide by 10
-	PCHL			; Otherwise return normally
+	lxi	bc,9474H	; BCDE = 1000000.0
+	lxi	de,23F7H
+	call	FCompareWithBCDE
+	pop	hl		; Get return address
+	jpo	FOutDiv10	; If >= 1M, divide by 10
+	pchl			; Otherwise return normally
 ;-----------------------------------------------------------------------------
 ; Floating Point Constants
 ;-----------------------------------------------------------------------------
 ONE_HALF:
-	DB	00H,00H,00H,80H	; 0.5 (mantissa 00 00 00, exp 80)
+	db	00H,00H,00H,80H	; 0.5 (mantissa 00 00 00, exp 80)
 ; Table of powers of 10 as 24-bit integers (for digit extraction)
 DECIMAL_POWERS:
-	DB	0A0H,86H,01H	; 100000
-	DB	10H,27H,00H	; 10000
-	DB	0E8H,03H,00H	; 1000
-	DB	64H,00H,00H	; 100
-	DB	0AH,00H,00H	; 10
-	DB	01H,00H,00H	; 1
+	db	0A0H,86H,01H	; 100000
+	db	10H,27H,00H	; 10000
+	db	0E8H,03H,00H	; 1000
+	db	64H,00H,00H	; 100
+	db	0AH,00H,00H	; 10
+	db	01H,00H,00H	; 1
 ;-----------------------------------------------------------------------------
 ; SQR - Square Root (Optional Function #1)
 ; Uses Newton's method: x[n+1] = (x[n] + N/x[n]) / 2
 ; Iterates 4 times for convergence
 ;-----------------------------------------------------------------------------
-Sqr:	RST	5		; FTestSign - check argument
-	JM	FunctionCallError ; Negative: FC error
-	RZ			; Zero: return zero
+Sqr:	rst	5		; FTestSign - check argument
+	jm	FunctionCallError ; Negative: FC error
+	rz			; Zero: return zero
 	; Extract exponent/2 for later (sqrt scales exponent by half)
-	LXI	HL,FACCUM_EXP	; Point to exponent
-	MOV	A,M		; Get exponent
-	RAR			; Divide by 2 (into carry too)
-	PUSH	PSW		; Save exponent/2 + carry
-	PUSH	HL		; Save exponent pointer
+	lxi	hl,FACCUM_EXP	; Point to exponent
+	mov	a,m		; Get exponent
+	rar			; Divide by 2 (into carry too)
+	push	psw		; Save exponent/2 + carry
+	push	hl		; Save exponent pointer
 	; Set exponent to 0x80 or 0x81 (normalize to ~1.0)
-	MVI	A,40H		; Base 0x40
-	RAL			; Add carry from above
-	MOV	M,A		; Set new exponent
+	mvi	a,40H		; Base 0x40
+	ral			; Add carry from above
+	mov	m,a		; Set new exponent
 	; Copy FACCUM to FBUFFER as initial guess
-	LXI	HL,FBUFFER
-	CALL	FCopyToMem
+	lxi	hl,FBUFFER
+	call	FCopyToMem
 	; Newton's method: 4 iterations
-	MVI	A,04H		; Iteration count
+	mvi	a,04H		; Iteration count
 SqrLoop:
-	PUSH	PSW		; Save count
-	CALL	FPush		; Push current estimate
-	LXI	HL,FBUFFER	; Original value
-	CALL	FLoadBCDEfromMem
-	CALL	FDiv		; FACCUM = original / estimate
-	POP	BC		; Get pushed estimate
-	POP	DE
-	CALL	FAdd		; FACCUM = estimate + original/estimate
+	push	psw		; Save count
+	call	FPush		; Push current estimate
+	lxi	hl,FBUFFER	; Original value
+	call	FLoadBCDEfromMem
+	call	FDiv		; FACCUM = original / estimate
+	pop	bc		; Get pushed estimate
+	pop	de
+	call	FAdd		; FACCUM = estimate + original/estimate
 	; Multiply by 0.5 (divide by 2)
-	LXI	BC,8000H	; BCDE = 0.5
-	MOV	D,C
-	MOV	E,C
-	CALL	FMul		; FACCUM = (estimate + N/estimate) / 2
-	POP	PSW		; Get iteration count
-	DCR	A
-	JNZ	SqrLoop		; Continue if not done
+	lxi	bc,8000H	; BCDE = 0.5
+	mov	d,c
+	mov	e,c
+	call	FMul		; FACCUM = (estimate + N/estimate) / 2
+	pop	psw		; Get iteration count
+	dcr	a
+	jnz	SqrLoop		; Continue if not done
 	; Restore exponent correction
-	POP	HL		; HL = exponent pointer
-	POP	PSW		; A = original exponent/2
-	ADI	0C0H		; Adjust for bias (0x80 - 0x40)
-	ADD	M		; Add to computed exponent
-	MOV	M,A		; Store final exponent
-	RET
+	pop	hl		; HL = exponent pointer
+	pop	psw		; A = original exponent/2
+	adi	0C0H		; Adjust for bias (0x80 - 0x40)
+	add	m		; Add to computed exponent
+	mov	m,a		; Store final exponent
+	ret
 ;-----------------------------------------------------------------------------
 ; RND - Random Number Generator (Optional Function #2)
 ; Uses linear congruential generator: seed = seed * 11879546 + offset
 ; Returns random number 0 <= x < 1
 ; If argument is negative, reseeds from argument
 ;-----------------------------------------------------------------------------
-Rnd:	RST	5		; FTestSign - check argument
-	LXI	HL,RND_SEED	; Point to current seed
-	CALL	FLoadFromMem	; Load seed to FACCUM
-	RZ			; If zero, return zero
+Rnd:	rst	5		; FTestSign - check argument
+	lxi	hl,RND_SEED	; Point to current seed
+	call	FLoadFromMem	; Load seed to FACCUM
+	rz			; If zero, return zero
 	; Linear congruential: seed * 11879546
-	LXI	BC,9835H	; Multiplier constant
-	LXI	DE,447AH
-	CALL	FMul
+	lxi	bc,9835H	; Multiplier constant
+	lxi	de,447AH
+	call	FMul
 	; Add small constant
-	LXI	BC,6828H	; Addend constant
-	LXI	DE,0B146H
-	CALL	FAdd
+	lxi	bc,6828H	; Addend constant
+	lxi	de,0B146H
+	call	FAdd
 	; Scramble mantissa bytes and normalize to 0-1 range
-	CALL	FCopyToBCDE	; Get result to BCDE
-	MOV	A,E		; Swap low and high mantissa bytes
-	MOV	E,C
-	MOV	C,A
-	MVI	M,80H		; Set FTEMP_SIGN = positive
-	DCX	HL
-	MOV	B,M		; Save exponent
-	MVI	M,80H		; Set exponent = 0 (value < 1)
-	CALL	FNormalise+3	; Normalize result
+	call	FCopyToBCDE	; Get result to BCDE
+	mov	a,e		; Swap low and high mantissa bytes
+	mov	e,c
+	mov	c,a
+	mvi	m,80H		; Set FTEMP_SIGN = positive
+	dcx	hl
+	mov	b,m		; Save exponent
+	mvi	m,80H		; Set exponent = 0 (value < 1)
+	call	FNormalise+3	; Normalize result
 	; Save new seed and return
-	LXI	HL,RND_SEED
-	JMP	FCopyToMem	; Store new seed and return
+	lxi	hl,RND_SEED
+	jmp	FCopyToMem	; Store new seed and return
 RND_SEED:
-	DB	52H,0C7H,4FH,80H ; Initial seed: 0.811635
+	db	52H,0C7H,4FH,80H ; Initial seed: 0.811635
 ;-----------------------------------------------------------------------------
 ; SIN - Sine Function (Optional Function #3)
 ; Uses Taylor series approximation after reducing angle to -0.25 to 0.25
 ; Input: angle in radians in FACCUM
 ;-----------------------------------------------------------------------------
-Sin:	CALL	FPush		; Push x (radians)
+Sin:	call	FPush		; Push x (radians)
 	; Scale to turns: u = x / (2*pi)
-	LXI	BC,8349H	; BCDE = 2*pi = 6.283185
-	LXI	DE,0FDBH
-	CALL	FLoadFromBCDE	; Load 2*pi
-	POP	BC		; Get x
-	POP	DE
-	CALL	FDiv		; u = x / 2pi
+	lxi	bc,8349H	; BCDE = 2*pi = 6.283185
+	lxi	de,0FDBH
+	call	FLoadFromBCDE	; Load 2*pi
+	pop	bc		; Get x
+	pop	de
+	call	FDiv		; u = x / 2pi
 	; Get fractional part: u = u - INT(u)
-	CALL	FPush		; Push u
-	CALL	Int		; INT(u)
-	POP	BC		; Get u
-	POP	DE
-	CALL	FSub		; u = u - INT(u), now -1 < u < 1
+	call	FPush		; Push u
+	call	Int		; INT(u)
+	pop	bc		; Get u
+	pop	de
+	call	FSub		; u = u - INT(u), now -1 < u < 1
 	; Reduce to quadrant: subtract 0.25
-	LXI	BC,7F00H	; BCDE = 0.25
-	MOV	D,C
-	MOV	E,C
-	CALL	FSub		; u = u - 0.25
+	lxi	bc,7F00H	; BCDE = 0.25
+	mov	d,c
+	mov	e,c
+	call	FSub		; u = u - 0.25
 	; Check sign for quadrant adjustment
-	RST	5		; FTestSign
-	STC			; Set carry (no negate needed)
-	JP	SinQuadrant	; If positive, continue
+	rst	5		; FTestSign
+	stc			; Set carry (no negate needed)
+	jp	SinQuadrant	; If positive, continue
 	; Negative: add 0.5 and check again
-	CALL	FAddMem		; Add ONE_HALF
-	RST	5		; FTestSign again
-	ORA	A		; Clear carry (negate needed)
+	call	FAddMem		; Add ONE_HALF
+	rst	5		; FTestSign again
+	ora	a		; Clear carry (negate needed)
 SinQuadrant:
-	PUSH	PSW		; Save carry (negate flag)
-	CP	FNegate		; If positive, negate
+	push	psw		; Save carry (negate flag)
+	cp	FNegate		; If positive, negate
 	; Add 0.25 back
-	LXI	BC,7F00H	; BCDE = 0.25
-	MOV	D,C
-	MOV	E,C
-	CALL	FAdd		; Adjust quadrant
-	POP	PSW
-	CNC	FNegate		; Final sign adjustment
+	lxi	bc,7F00H	; BCDE = 0.25
+	mov	d,c
+	mov	e,c
+	call	FAdd		; Adjust quadrant
+	pop	psw
+	cnc	FNegate		; Final sign adjustment
 	; Now compute Taylor series for sine
 	; sin(q) ≈ q * (c0 + q² * (c1 + q² * (c2 + q² * (c3 + q² * c4))))
-	CALL	FPush		; Push q
-	CALL	FCopyToBCDE	; Get q to BCDE
-	CALL	FMul		; q² = q * q
-	CALL	FPush		; Push q²
-	LXI	HL,SIN_COEFFS	; Taylor coefficients table
-	CALL	FLoadFromMem	; Load first coefficient
-	POP	BC		; Get q²
-	POP	DE
-	MVI	A,04H		; 4 iterations
+	call	FPush		; Push q
+	call	FCopyToBCDE	; Get q to BCDE
+	call	FMul		; q² = q * q
+	call	FPush		; Push q²
+	lxi	hl,SIN_COEFFS	; Taylor coefficients table
+	call	FLoadFromMem	; Load first coefficient
+	pop	bc		; Get q²
+	pop	de
+	mvi	a,04H		; 4 iterations
 SinTaylorLoop:
-	PUSH	PSW		; Save count
-	PUSH	DE		; Push q²
-	PUSH	BC
-	PUSH	HL		; Save coefficient pointer
-	CALL	FMul		; acc = acc * q²
-	POP	HL		; Get coefficient pointer
-	CALL	FLoadBCDEfromMem ; Load next coefficient
-	PUSH	HL		; Save updated pointer
-	CALL	FAdd		; acc = acc * q² + coeff
-	POP	HL		; Restore pointer
-	POP	BC		; Get q²
-	POP	DE
-	POP	PSW		; Get count
-	DCR	A
-	JNZ	SinTaylorLoop	; Continue if not done
-	JMP	FMulEntry	; Final multiply by q and return (pops BC/DE from stack)
+	push	psw		; Save count
+	push	de		; Push q²
+	push	bc
+	push	hl		; Save coefficient pointer
+	call	FMul		; acc = acc * q²
+	pop	hl		; Get coefficient pointer
+	call	FLoadBCDEfromMem ; Load next coefficient
+	push	hl		; Save updated pointer
+	call	FAdd		; acc = acc * q² + coeff
+	pop	hl		; Restore pointer
+	pop	bc		; Get q²
+	pop	de
+	pop	psw		; Get count
+	dcr	a
+	jnz	SinTaylorLoop	; Continue if not done
+	jmp	FMulEntry	; Final multiply by q and return (pops BC/DE from stack)
 ;-----------------------------------------------------------------------------
 ; Taylor series coefficients for sine
 ; These approximate: sin(pi*x) / (pi*x) for small x
 ;-----------------------------------------------------------------------------
 SIN_COEFFS:
-	DB	0BAH,0D7H,1EH,86H ; 39.710670
-	DB	64H,26H,99H,87H	  ; -76.574982
-	DB	58H,34H,23H,87H	  ; 81.602234
-	DB	0E0H,5DH,0A5H,86H ; -41.341675
-	DB	0DAH,0FH,49H,83H  ; 6.283185 (2*pi)
-	DB	00H,00H		  ; End marker
+	db	0BAH,0D7H,1EH,86H ; 39.710670
+	db	64H,26H,99H,87H	  ; -76.574982
+	db	58H,34H,23H,87H	  ; 81.602234
+	db	0E0H,5DH,0A5H,86H ; -41.341675
+	db	0DAH,0FH,49H,83H  ; 6.283185 (2*pi)
+	db	00H,00H		  ; End marker
 ;=============================================================================
 ; INITIALIZATION CODE (Part 1 - I/O Detection)
 ; This code runs once at cold start to detect terminal hardware
 ; and configure I/O ports. Memory is reclaimed after initialization.
 ;=============================================================================
 DetectIO:
-	IN	0FFH		; Read sense switches
-	ANI	0F0H		; Mask upper nibble
-	RRC			; Shift to get device type
-	RRC
-	CPI	3CH		; Check for specific device
-	RZ			; Return if match
-	CPI	38H		; Check for alternate device
-	STC			; Set carry
-	JNZ	IOConfigTable	; Not found, use config table
+	in	0FFH		; Read sense switches
+	ani	0F0H		; Mask upper nibble
+	rrc			; Shift to get device type
+	rrc
+	cpi	3CH		; Check for specific device
+	rz			; Return if match
+	cpi	38H		; Check for alternate device
+	stc			; Set carry
+	jnz	IOConfigTable	; Not found, use config table
 	; Read device-specific configuration
-	LXI	HL,0FFFH	; Top of memory
-	MOV	C,M		; Get config byte
-	DCX	HL
-	MOV	A,M		; Get another config byte
-	ANI	0F0H
-	RRC
-	RRC
+	lxi	hl,0FFFH	; Top of memory
+	mov	c,m		; Get config byte
+	dcx	hl
+	mov	a,m		; Get another config byte
+	ani	0F0H
+	rrc
+	rrc
 IOConfigTable:
-	PUSH	PSW
-	MOV	L,A		; Index into config table
-	MVI	H,00H
-	LXI	DE,IO_CONFIG_TABLE
-	DAD	DE		; HL = table entry
-	MOV	A,M		; Load configuration values
-	INX	HL
-	MOV	D,M
-	INX	HL
-	MOV	B,M
-	INX	HL
-	MOV	E,M
-	MOV	H,A
-	POP	PSW
-	PUSH	PSW
-	MOV	A,H
-	JC	StoreIOConfig
-	MOV	A,C
+	push	psw
+	mov	l,a		; Index into config table
+	mvi	h,00H
+	lxi	de,IO_CONFIG_TABLE
+	dad	de		; HL = table entry
+	mov	a,m		; Load configuration values
+	inx	hl
+	mov	d,m
+	inx	hl
+	mov	b,m
+	inx	hl
+	mov	e,m
+	mov	h,a
+	pop	psw
+	push	psw
+	mov	a,h
+	jc	StoreIOConfig
+	mov	a,c
 StoreIOConfig:
-	STA	0DA0H		; Store I/O port
-	POP	PSW
-	LXI	HL,DoOptionalFns ; Return address after I/O config
-	PUSH	HL
-	MVI	C,0FFH
-	CPI	10H
-	LXI	HL,Start
-	SHLD	D038F		; Store jump address
-	JZ	IOConfigAlt
-	CPI	08H
-	RNC			; Return if device type >= 8
-	ADI	11H
-	PUSH	PSW
-	MVI	A,03H
-	CALL	IOPortOut
-	POP	PSW
-	JMP	IOPortOut
+	sta	0DA0H		; Store I/O port
+	pop	psw
+	lxi	hl,DoOptionalFns ; Return address after I/O config
+	push	hl
+	mvi	c,0FFH
+	cpi	10H
+	lxi	hl,Start
+	shld	D038F		; Store jump address
+	jz	IOConfigAlt
+	cpi	08H
+	rnc			; Return if device type >= 8
+	adi	11H
+	push	psw
+	mvi	a,03H
+	call	IOPortOut
+	pop	psw
+	jmp	IOPortOut
 IOConfigAlt:
-	XRA	A
-	CALL	IOPortOut
-	CALL	IOPortInc
-	CALL	IOPortInc
-	CMA
-	MVI	C,01H
-	CALL	IOPortInc
-	PUSH	HL
-	LHLD	IOPortOut
-	MVI	L,0DBH
-	SHLD	D038F
-	POP	HL
-	MVI	A,2CH
-	DCR	M
-	CALL	IOPortOut
-	DCR	M
-	DCR	M
-	DCR	M
+	xra	a
+	call	IOPortOut
+	call	IOPortInc
+	call	IOPortInc
+	cma
+	mvi	c,01H
+	call	IOPortInc
+	push	hl
+	lhld	IOPortOut
+	mvi	l,0DBH
+	shld	D038F
+	pop	hl
+	mvi	a,2CH
+	dcr	m
+	call	IOPortOut
+	dcr	m
+	dcr	m
+	dcr	m
 IOPortInc:
-	LXI	HL,0DA0H
-	INR	M
+	lxi	hl,0DA0H
+	inr	m
 IOPortOut:
-	OUT	10H		; Output to I/O port
-	RET
+	out	10H		; Output to I/O port
+	ret
 ;-----------------------------------------------------------------------------
 ; I/O Configuration Table
 ; Contains device-specific parameters for different terminal types
 ;-----------------------------------------------------------------------------
 IO_CONFIG_TABLE:
-	DB	10H,0CAH,01H,02H ; Device 0 config
-	DB	10H,0CAH,01H,02H ; Device 1 config
-	DB	00H,0C2H,01H,80H ; Device 2 config
-	DB	06H,0C2H,01H,80H ; Device 3 config
-	DB	20H,0CAH,80H,80H ; Device 4 config
-	DB	04H,0CAH,02H,01H ; Device 5 config
-	DB	24H,0CAH	 ; Device 6 config (partial)
-	DB	40H,40H		 ; More config data
+	db	10H,0CAH,01H,02H ; Device 0 config
+	db	10H,0CAH,01H,02H ; Device 1 config
+	db	00H,0C2H,01H,80H ; Device 2 config
+	db	06H,0C2H,01H,80H ; Device 3 config
+	db	20H,0CAH,80H,80H ; Device 4 config
+	db	04H,0CAH,02H,01H ; Device 5 config
+	db	24H,0CAH	 ; Device 6 config (partial)
+	db	40H,40H		 ; More config data
 ;-----------------------------------------------------------------------------
 ; ConfigIO - Configure I/O code with detected hardware settings
 ; Called after DetectIO to set up I/O port addresses in the code
 ;-----------------------------------------------------------------------------
 DoOptionalFns:
 ConfigIO:
-	MOV	H,D		; Get detected I/O parameters
-	MOV	L,B
-	SHLD	0396H		; Patch InputChar device-ready check
-	MOV	A,H
-	ANI	0C8H		; Mask for TestBreakKey
-	MOV	H,A
-	SHLD	0484H		; Patch TestBreakKey
-	XCHG
-	SHLD	D0387		; Patch output port address
-	LDA	0DA0H		; Get input port number
-	STA	0394H		; Patch InputChar port
-	STA	0482H		; Patch TestBreakKey port
-	INR	A
-	STA	039BH		; Patch another I/O reference
-	ADD	C
-	STA	D0385		; Store print buffer offset
-	INR	A
-	STA	D038D		; Store another buffer offset
-	RET
+	mov	h,d		; Get detected I/O parameters
+	mov	l,b
+	shld	0396H		; Patch InputChar device-ready check
+	mov	a,h
+	ani	0C8H		; Mask for TestBreakKey
+	mov	h,a
+	shld	0484H		; Patch TestBreakKey
+	xchg
+	shld	D0387		; Patch output port address
+	lda	0DA0H		; Get input port number
+	sta	0394H		; Patch InputChar port
+	sta	0482H		; Patch TestBreakKey port
+	inr	a
+	sta	039BH		; Patch another I/O reference
+	add	c
+	sta	D0385		; Store print buffer offset
+	inr	a
+	sta	D038D		; Store another buffer offset
+	ret
 
-	DB	0, 0		; Padding/unused
+	db	0, 0		; Padding/unused
 
 ;=============================================================================
 ; Init - Initialization Code
@@ -3079,146 +3121,146 @@ ConfigIO:
 ; width, then initializes BASIC and prints "XXXX BYTES FREE"
 ; This memory is reclaimed for program storage after init completes.
 ;=============================================================================
-Init:	LXI	HL,0F40H	; Default top of memory (3904 bytes)
-	SPHL			; Set stack pointer
-	SHLD	STACK_TOP	; Save stack top
-	CALL	DetectIO	; Detect and configure I/O hardware
-	LXI	HL,0FFFFH	; Current line = -1 (direct mode)
-	SHLD	CURRENT_LINE
-	CALL	NewLine		; Print newline
+Init:	lxi	hl,0F40H	; Default top of memory (3904 bytes)
+	sphl			; Set stack pointer
+	shld	STACK_TOP	; Save stack top
+	call	DetectIO	; Detect and configure I/O hardware
+	lxi	hl,0FFFFH	; Current line = -1 (direct mode)
+	shld	CURRENT_LINE
+	call	NewLine		; Print newline
 ; Ask user for memory size
 AskMemorySize:
-	LXI	HL,szMemorySize	; "MEMORY SIZE"
-	CALL	PrintString+1	; Skip INX HL
-	CALL	InputLineWithQ	; Get user input with "? " prompt
-	JC	AskMemorySize	; Retry on error
-	RST	2		; NextChar
-	ORA	A		; Empty input?
-	JNZ	ParseMemorySize	; No, parse the number
+	lxi	hl,szMemorySize	; "MEMORY SIZE"
+	call	PrintString+1	; Skip INX HL
+	call	InputLineWithQ	; Get user input with "? " prompt
+	jc	AskMemorySize	; Retry on error
+	rst	2		; NextChar
+	ora	a		; Empty input?
+	jnz	ParseMemorySize	; No, parse the number
 	; Auto-detect memory size
-	LXI	HL,0EFAH	; Start just above init code
+	lxi	hl,0EFAH	; Start just above init code
 AutoDetectMem:
-	INX	HL		; Check next byte
-	MOV	A,H		; Check for wrap to 0000
-	ORA	L
-	JZ	GotMemoryTop	; Wrapped, use previous address
-	MOV	A,M		; Read memory
-	CMA			; Complement
-	MOV	M,A		; Write back
-	CMP	M		; Did it stick?
-	JZ	AutoDetectMem	; Yes, continue
-	JMP	GotMemoryTop	; No, found top of RAM
+	inx	hl		; Check next byte
+	mov	a,h		; Check for wrap to 0000
+	ora	l
+	jz	GotMemoryTop	; Wrapped, use previous address
+	mov	a,m		; Read memory
+	cma			; Complement
+	mov	m,a		; Write back
+	cmp	m		; Did it stick?
+	jz	AutoDetectMem	; Yes, continue
+	jmp	GotMemoryTop	; No, found top of RAM
 ParseMemorySize:
-	LXI	HL,LINE_BUFFER	; Parse number from input
-	CALL	LineNumberFromStr
-	MOV	A,M		; Check for trailing garbage
-	ORA	A
-	JNZ	SyntaxError
-	XCHG			; HL = memory size
+	lxi	hl,LINE_BUFFER	; Parse number from input
+	call	LineNumberFromStr
+	mov	a,m		; Check for trailing garbage
+	ora	a
+	jnz	SyntaxError
+	xchg			; HL = memory size
 GotMemoryTop:
-	DCX	HL		; HL = last usable address (top-1)
-	PUSH	HL		; Save memory top on stack
+	dcx	hl		; HL = last usable address (top-1)
+	push	hl		; Save memory top on stack
 ;-----------------------------------------------------------------------
 ; Ask user for terminal width (default 72 if empty)
 ;-----------------------------------------------------------------------
 AskTerminalWidth:
-	LXI	HL,szTerminalWidth
-	CALL	PrintString+1	; Skip INX HL
-	CALL	InputLineWithQ	; Get input with "?" prompt
-	JC	AskTerminalWidth ; On break, ask again
-	RST	2		; NextChar - get first char
-	ORA	A		; Empty input?
-	MVI	A,48H		; Default width = 72 (0x48)
-	MOV	E,A		; Save default in E
-	JZ	SetTermWidth	; If empty, use default
-	CALL	LineNumberFromStr ; Parse width from input
-	MOV	A,E		; Get parsed width
-	CPI	0FH		; Minimum width = 15
-	JC	AskTerminalWidth ; Too small, ask again
+	lxi	hl,szTerminalWidth
+	call	PrintString+1	; Skip INX HL
+	call	InputLineWithQ	; Get input with "?" prompt
+	jc	AskTerminalWidth ; On break, ask again
+	rst	2		; NextChar - get first char
+	ora	a		; Empty input?
+	mvi	a,48H		; Default width = 72 (0x48)
+	mov	e,a		; Save default in E
+	jz	SetTermWidth	; If empty, use default
+	call	LineNumberFromStr ; Parse width from input
+	mov	a,e		; Get parsed width
+	cpi	0FH		; Minimum width = 15
+	jc	AskTerminalWidth ; Too small, ask again
 SetTermWidth:
-	STA	TERMINAL_WIDTH	; Store terminal width
+	sta	TERMINAL_WIDTH	; Store terminal width
 ;-----------------------------------------------------------------------
 ; Calculate last tab stop position
 ; Tab stops are every 14 characters. Calculate: width - (width % 14)
 ;-----------------------------------------------------------------------
 CalcTabStop:
-	SUI	0EH		; Subtract 14
-	JNC	CalcTabStop	; Loop until negative
-	ADI	1CH		; Add 28 (14*2) to restore + offset
-	CMA			; Negate to get -remainder
-	INR	A
-	ADD	E		; Add to width: last_tab = width - (width % 14)
-	STA	05C5H		; Store last tab position
+	sui	0EH		; Subtract 14
+	jnc	CalcTabStop	; Loop until negative
+	adi	1CH		; Add 28 (14*2) to restore + offset
+	cma			; Negate to get -remainder
+	inr	a
+	add	e		; Add to width: last_tab = width - (width % 14)
+	sta	05C5H		; Store last tab position
 ;-----------------------------------------------------------------------
 ; Optional function configuration (SIN, RND, SQR)
 ; User can disable functions to reclaim memory for program storage.
 ; Each function descriptor contains: base addr, prompt string, jump table entry
 ;-----------------------------------------------------------------------
 AskOptionalFns:
-	LXI	HL,OPT_FN_DESCS	; Point to function descriptors
+	lxi	hl,OPT_FN_DESCS	; Point to function descriptors
 OptFnLoop:
-	RST	6		; PushNextWord - push program base for this fn
-	LXI	DE,szSIN	; End marker (first string after descriptors)
-	RST	4		; CompareHLDE - past end of table?
-	JZ	OptFnDone	; Yes, done with optional functions
-	RST	6		; PushNextWord - get prompt string address
-	XTHL			; HL = prompt string, stack has descriptor ptr
-	CALL	PrintString+1	; Print "WANT xxx" (skip INX HL)
-	CALL	InputLineWithQ	; Get Y/N response
-	RST	2		; NextChar - get first char of response
-	POP	HL		; Restore descriptor pointer
-	CPI	59H		; 'Y' - want this function?
+	rst	6		; PushNextWord - push program base for this fn
+	lxi	de,szSIN	; End marker (first string after descriptors)
+	rst	4		; CompareHLDE - past end of table?
+	jz	OptFnDone	; Yes, done with optional functions
+	rst	6		; PushNextWord - get prompt string address
+	xthl			; HL = prompt string, stack has descriptor ptr
+	call	PrintString+1	; Print "WANT xxx" (skip INX HL)
+	call	InputLineWithQ	; Get Y/N response
+	rst	2		; NextChar - get first char of response
+	pop	hl		; Restore descriptor pointer
+	cpi	59H		; 'Y' - want this function?
 OptFnDone:
-	POP	DE		; Get program base address
-	JZ	InitComplete	; Yes or end of table, keep function
-	CPI	4EH		; 'N' - don't want this function?
-	JNZ	AskOptionalFns	; Invalid response, start over
+	pop	de		; Get program base address
+	jz	InitComplete	; Yes or end of table, keep function
+	cpi	4EH		; 'N' - don't want this function?
+	jnz	AskOptionalFns	; Invalid response, start over
 	; User said No - disable the function
-	RST	6		; PushNextWord - get jump table entry address
-	XTHL			; HL = jump table entry, stack has descriptor ptr
-	LXI	DE,FunctionCallError ; Error handler address
-	MOV	M,E		; Patch jump table to point to error
-	INX	HL
-	MOV	M,D
-	POP	HL		; Restore descriptor pointer
-	JMP	OptFnLoop	; Process next function
+	rst	6		; PushNextWord - get jump table entry address
+	xthl			; HL = jump table entry, stack has descriptor ptr
+	lxi	de,FunctionCallError ; Error handler address
+	mov	m,e		; Patch jump table to point to error
+	inx	hl
+	mov	m,d
+	pop	hl		; Restore descriptor pointer
+	jmp	OptFnLoop	; Process next function
 ;-----------------------------------------------------------------------
 ; Initialization complete - set up program base and memory
 ;-----------------------------------------------------------------------
 InitComplete:
-	XCHG			; HL = program base address (from DE)
-	MVI	M,00H		; Write null byte at program base
-	INX	HL
-	SHLD	PROGRAM_BASE	; Store program base address
-	XTHL			; HL = memory top, push program base
-	LXI	DE,0F40H	; Minimum memory required
-	RST	4		; CompareHLDE - enough memory?
-	JC	OutOfMemory	; No, error
-	POP	DE		; DE = program base
-	SPHL			; Set stack pointer to memory top
-	SHLD	STACK_TOP	; Save stack top
-	XCHG			; HL = program base, DE = stack top
-	CALL	CheckEnoughMem+1 ; Verify enough space (enter at PUSH HL)
+	xchg			; HL = program base address (from DE)
+	mvi	m,00H		; Write null byte at program base
+	inx	hl
+	shld	PROGRAM_BASE	; Store program base address
+	xthl			; HL = memory top, push program base
+	lxi	de,0F40H	; Minimum memory required
+	rst	4		; CompareHLDE - enough memory?
+	jc	OutOfMemory	; No, error
+	pop	de		; DE = program base
+	sphl			; Set stack pointer to memory top
+	shld	STACK_TOP	; Save stack top
+	xchg			; HL = program base, DE = stack top
+	call	CheckEnoughMem+1 ; Verify enough space (enter at PUSH HL)
 	; Calculate free bytes: (stack_top - program_base) - 16
-	MOV	A,E		; DE still has stack top
-	SUB	L
-	MOV	L,A
-	MOV	A,D
-	SBB	H
-	MOV	H,A		; HL = stack_top - program_base
-	LXI	BC,0FFF0H	; -16 for overhead
-	DAD	BC		; HL = free bytes
-	CALL	PrintInt	; Print free byte count
-	LXI	HL,szBytesFree	; " BYTES FREE" message
-	CALL	PrintString+1	; Skip INX HL (HL already points to first char)
+	mov	a,e		; DE still has stack top
+	sub	l
+	mov	l,a
+	mov	a,d
+	sbb	h
+	mov	h,a		; HL = stack_top - program_base
+	lxi	bc,0FFF0H	; -16 for overhead
+	dad	bc		; HL = free bytes
+	call	PrintInt	; Print free byte count
+	lxi	hl,szBytesFree	; " BYTES FREE" message
+	call	PrintString+1	; Skip INX HL (HL already points to first char)
 	; Patch startup code for subsequent runs
-	LXI	HL,PrintString+1 ; After first run, Main should call
-	SHLD	0205H		;   PrintString+1 (skip INX HL)
-	CALL	Run		; Initialize variables (NEW without msg)
+	lxi	hl,PrintString+1 ; After first run, Main should call
+	shld	0205H		;   PrintString+1 (skip INX HL)
+	call	Run		; Initialize variables (NEW without msg)
 	; Redirect cold start to warm start
-	LXI	HL,Main		; Future starts go to Main
-	SHLD	0002H		;   instead of Init
-	PCHL			; Jump to Main
+	lxi	hl,Main		; Future starts go to Main
+	shld	0002H		;   instead of Init
+	pchl			; Jump to Main
 ;-----------------------------------------------------------------------
 ; Optional Function Descriptors
 ; Each entry: program_base (DW), prompt_string (DW), jump_table_entry (DW)
@@ -3227,28 +3269,28 @@ InitComplete:
 ;-----------------------------------------------------------------------
 OPT_FN_DESCS:
 	; SIN function descriptor
-	DW	0D22H		; Program base if SIN enabled
-	DW	szSIN		; Prompt string "SIN"
-	DW	004FH		; Jump table entry for SIN
+	dw	0D22H		; Program base if SIN enabled
+	dw	szSIN		; Prompt string "SIN"
+	dw	004FH		; Jump table entry for SIN
 	; RND function descriptor
-	DW	0CA0H		; Program base if RND enabled (SIN disabled)
-	DW	szRND		; Prompt string "RND"
-	DW	004DH		; Jump table entry for RND
+	dw	0CA0H		; Program base if RND enabled (SIN disabled)
+	dw	szRND		; Prompt string "RND"
+	dw	004DH		; Jump table entry for RND
 	; SQR function descriptor
-	DW	0C6DH		; Program base if SQR enabled (SIN,RND disabled)
-	DW	szSQR		; Prompt string "SQR"
-	DW	004BH		; Jump table entry for SQR
+	dw	0C6DH		; Program base if SQR enabled (SIN,RND disabled)
+	dw	szSQR		; Prompt string "SQR"
+	dw	004BH		; Jump table entry for SQR
 	; End marker / minimum program base
-	DW	0C2FH		; Program base if all optional fns disabled
+	dw	0C2FH		; Program base if all optional fns disabled
 ;-----------------------------------------------------------------------
 ; Initialization String Constants
 ;-----------------------------------------------------------------------
-szSIN:	DB	'SIN',0		; Optional function prompts
-szRND:	DB	'RND',0
-szSQR:	DB	'SQR',0
+szSIN:	db	'SIN',0		; Optional function prompts
+szRND:	db	'RND',0
+szSQR:	db	'SQR',0
 szTerminalWidth:
-	DB	'TERMINAL WIDTH',0
+	db	'TERMINAL WIDTH',0
 szMemorySize:
-	DB	'MEMORY SIZE'
+	db	'MEMORY SIZE'
 
-	END
+	end
