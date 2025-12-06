@@ -1,0 +1,61 @@
+Don't read the following .pdf with the usual
+claude pdf reader as you get stuck in a too large loop.
+
+You ran an OCR of AltairBASIC-1975.pdf
+creating AltairBASIC-1975-v0.txt
+
+read AltairBASIC-1975-v0.txt
+now create AltairBASIC-1975-v1.txt
+Clean up as described below:
+
+The v0 text is a listing file of assembling
+code for an 8080 processor.
+
+Each line with code has :
+
+A-4digit hnumber B-2digit or C-4digt or D-6digit
+
+hhumber hex number
+A-4 digit 16bit address in memory, only incements. goes up 1 per byte on previous line
+B-one byte opcode, fore exampe E1 is the opcode for pop h
+C-two byte, this is a one byte opcode followed by immediate data 1 byte
+ for example 3E01 movi a,1 ; 3E is the opcode for mvi, 1 is the data
+D-one bute opcode followed by two bytes, forms a 16bit number
+  low byte first
+   for example: 202F CD681C     CALL    SIGNACC
+  here 202f address where it is located
+  cd - call opcode
+  1c68 address of SIGNACC
+
+List of all the opcodes ~/src/cpmemu/src/8080.txt
+
+Clean up the file so it all makes sense. Between the numbers and the
+opcodes and data there is duplicate info.  Use the duplication so
+sort out errors.
+
+The number fields at the start of each line are all numbers
+so of its o2 it is 02.
+
+The address numbers go up by the right amount.
+If one line is "0023 00 nop" the next will begin 0024, as nop is one byte
+
+The next field the hex number byte needs to match the opcode text.
+For the immediate data it should match the data in the argument column
+For 2 byte data it should match the label.
+
+As you make passes over the data, record the value of each label you see
+it isn't always filled in.  WHen it is it needs to match. for example
+...
+FLMMMAC :
+19A9 CD0000     CALL    LDRGMM ;COMPUTE MM~AC
+...
+here FLMMAC has the value of 19A9
+later
+...
+1E89 CDA919     CALL FLMMMAC
+...
+here you can see that the use of FLMMAC has the same value
+
+fix the spaceing so the columns align.
+have one space after the opcode before the opcode argument
+align the ; comment collumns
