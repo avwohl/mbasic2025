@@ -60,7 +60,7 @@ trurom	set	0
 ;
 ;*
 	public	erredt,edit,editrt,popart
-	extrn	buf,bufmin,buflin,crdo,dot,edent,errflg,fininl,fndlin,inchri,outch1
+	extrn	buf,bufmin,buflin,crdo,dotx,edent,errflg,fininl,fndlin,inchri,outch1
 	extrn	linprt,linspc,lisprt,makups,outdo,pophrt,ready,userr
 	extrn	bltuc,errlin
 erredt:	sta	errflg			;reset the flag to call edit
@@ -74,8 +74,8 @@ erredt:	sta	errflg			;reset the flag to call edit
 edit:	call	linspc			;get the argument line number
 	rnz				;error if not end of line
 eredit:	pop	h			;get rid of newstt address
-eedits:	xchg				;save current line in dot
-	shld	dot			;for later edit or list
+eedits:	xchg				;save current line in dotx
+	shld	dotx			;for later edit or list
 	xchg				;get back line # in [h,l]
 	call	fndlin			;find the line in question
 	jnc	userr			;if not found, undefined statement error.

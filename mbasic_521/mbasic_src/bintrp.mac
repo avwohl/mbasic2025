@@ -1692,8 +1692,8 @@ savstk:	ds	2			;newstt saves stack here before
 					;can restore the stack when an
 					;error occurs
 errlin:	ds	2			;line number where last error occured.
-	public	dot
-dot:	ds	2			;keeps current line for edit & list
+	public	dotx
+dotx:	ds	2			;keeps current line for edit & list
 errtxt:	ds	2			;text pointer for use by "RESUME"
 	public	onelin
 onelin:	ds	2			;the line to goto when an error 
@@ -1822,14 +1822,14 @@ fmltt2:	ds	2			;5.21: fbuffr+41 (plus padding to 43)
 ;
 ; needed for messages in all versions
 ;
-intxt:	dc	' in '
+intxt:	db	' in '
 reddym:	db	0			;5.21: reddy-1 (null terminator)
 reddy:
-	dc	'Ok'
+	db	'Ok'
 	db	13
 	db	10
 	db	0
-brktxt:	dc	'Break'
+brktxt:	db	'Break'
 	db	0
 
 	page
@@ -1968,11 +1968,11 @@ error:
 	xra	a			;clear chain flag in case of error
 	sta	mrgflg			;also merge flag
 	sta	chnflg			;so it doesnt try to chain
-	mov	a,h			;only set up dot if it isnt direct
+	mov	a,h			;only set up dotx if it isnt direct
 	ana	l
 	inr	a
 	jz	erresm
-	shld	dot			;save it for edit or list
+	shld	dotx			;save it for edit or list
 erresm:	lxi	b,errmor		;get return address in [b,c]
 	public	ereset
 	extrn	stkerr
@@ -2150,8 +2150,8 @@ edent:	push	d			;save line #
 					;lines that start with ":" should not be
 					;ignored
 	push	psw			;blank so we don'T INSERT IT
-	xchg				;save this line # in dot
-	shld	dot
+	xchg				;save this line # in dotx
+	shld	dotx
 	xchg	
 	call	fndlin			;get a pointer to the line
 	jc	lexist			;line exists, delete it
@@ -2502,7 +2502,7 @@ loppsi:
 	cpi	$usr			;or usr definition?
 	jz	isresw
 	call	makupl			;get next char in line (mc 6/22/80)
-	cpi	'.'			;is it a dot
+	cpi	'.'			;is it a dotx
 	jz	isvars			;yes
 	call	tstanm			;is it a letter immediately following reswrd
 isvars:	mvi	a,0			;set donum to -1
@@ -2600,7 +2600,7 @@ numtry:	lda	donum			;test for numbers allowed
 	pop	d			;restore dep. pointer
 	jm	kstuff			;5.21: no, just stuff it (!)
 	jz	fltget			;if donum=0 then floating #'S ALLOWED
-	cpi	'.'			;is it dot?
+	cpi	'.'			;is it dotx?
 	jz	kstuff			;5.21: stuff it (edit .)
 	mvi	a,lincon		;get line # token
 	call	krnsav			;save it
@@ -2713,7 +2713,7 @@ krnvar:	call	krnsav			;save char
 	jnc	jkloop			;no, too large
 	cpi	'0'
 	jnc	krnvar			;yes, eat
-	cpi	'.'			;is it dot
+	cpi	'.'			;is it dotx
 	jz	krnvar			;yes, dots ok in var names
 jkloop:	jmp	kloop			;done looking at variable name
 notrs5:	mov	a,m			;get char from line
@@ -3188,7 +3188,7 @@ fcerr:	mvi	e,errfc			;too big. function call error
 linspc:	mov	a,m			;get char from memory
 	cpi	'.'			;is it current line specifier
 	xchg				;save text pointer
-	lhld	dot			;get current line #
+	lhld	dotx			;get current line #
 	xchg				;get back text pointer
 	jz	chrgtr			;all done.
 
@@ -3887,7 +3887,7 @@ reline:	push	b			;save back variable pointer
 	mvi	a,3			;set three for string
 	jmp	letcn2			;do the assignment
 tryagn:
-	dc	'?Redo from start'
+	db	'?Redo from start'
 	db	13
 	db	10
 	db	0
@@ -5498,7 +5498,7 @@ list4:	lxi	h,0+65535		;dont allow ^c to change
 	push	h			;save link on top
 	push	b			;save text pointer back
 	xchg				;get line # in [h,l]
-	shld	dot			;save for later edit or list
+	shld	dotx			;save for later edit or list
 					;and we want [h,l] on the stack
 	call	linprt			;print as int without leading space
 	pop	h
@@ -5543,7 +5543,7 @@ ploop2:	mov	a,m			;get char from buf
 ntembl:	ora	a			;set cc'S
 	jm	ploopr			;reserved word of some kind
 	mov	e,a			;save char in [e]
-	cpi	'.'			;dot is part of var name
+	cpi	'.'			;dotx is part of var name
 	jz	prtvar
 	call	tstanm			;is char alphanumeric
 	jnc	prtvar			;alphanumeric
@@ -6030,7 +6030,7 @@ scnex3:	pop	d			;get back current line #
 	dcx	h			;backup pointer
 scnex4:	jmp	scnext			;5.21: label for indirect jump
 
-linm:	dc	'Undefined line '
+linm:	db	'Undefined line '
 	db	0
 
 scnpt2:	cpi	ptrcon			;pointer
@@ -6136,7 +6136,7 @@ strnds:	shld	rndx+1
 	call	rndmn2
 	pop	h			;get back the text pointer
 	ret	
-ranmes:	dc	'Random number seed (-32768 to 32767)'
+ranmes:	db	'Random number seed (-32768 to 32767)'
 	db	0
 
 ;
