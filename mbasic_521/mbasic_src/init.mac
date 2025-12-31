@@ -391,24 +391,24 @@ smlstk:	mov	a,e			;subtract stack size from top mem
 auttxt:	db	13
 	db	10
 	db	10
-	dc	'Owned by Microsoft'
+	db	'Owned by Microsoft'
 	db	13
 	db	10
 	db	0
 
 
-words:	dc	' Bytes free'
+words:	db	' Bytes free'
 	db	0
 heding:
-	dc	'BASIC-80 Rev. 5.21'
+	db	'BASIC-80 Rev. 5.21'
 	db	13
 	db	10
-	dc	'[CP/M Version]'
+	db	'[CP/M Version]'
 	db	13
 	db	10
-	dc	'Copyright 1977-1981 (C) by Microsoft'
+	db	'Copyright 1977-1981 (C) by Microsoft'
 	db	13,10
-	dc	'Created: 28-Jul-81'
+	db	'Created: 28-Jul-81'
 	db	13,10
 	db	0
 lastwr::				;last word of system code+1
