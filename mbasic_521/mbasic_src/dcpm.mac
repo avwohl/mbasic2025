@@ -69,7 +69,7 @@ trurom	set	0
 
 	extrn	dcompr,getypr,synchr
 
-	extrn	filnam,filnm1,filnm9,filnm12
+	extrn	filnam,filnm1,filnm9,filn12
 	extrn	filna2
 	extrn	dirtmp
 ;internal symbols
@@ -792,7 +792,7 @@ fillo1:
 	jnz	fillop
 gotnam:
 	xra	a			;clear extent field
-	sta	filnm12			;5.21: filnam+12
+	sta	filn12			;5.21: filnam+12
 	pop	psw			;restore condition codes
 	pop	h			;get back text pointer
 	ret	
@@ -1110,7 +1110,7 @@ files:
 	pop	h			;restore text pointer
 filnb:	cnz	namfil			;scan file name
 	xra	a			;make sure extent is zero
-	sta	filnm12			;5.21: filnam+12
+	sta	filn12			;5.21: filnam+12
 	push	h			;save text pointer
 	lxi	h,filnm1		;5.21: get first char of file name (filnam+1)
 	mvi	c,8			;fill name with question marks

@@ -128,7 +128,7 @@ kbflen	set	buflen+(buflen/4)	;make krunch buffer somewhat
 	public	errlin,onelin,oneflg,trcflg,buflin,lisprt
 	extrn	strng$,space$,ton,toff
 	extrn	signs
-	public	fbuffr,fbufp1,fbufp27,fbufp33,fbufp34,fmltt1,fmltt2
+	public	fbuffr,fbufp1,fbufp27,fbup33,fbup34,fmltt1,fmltt2
 	public	minutk,plustk,linget,intxt,reddym,reddy
 	extrn	ttychr
 	public	txttab
@@ -1580,13 +1580,13 @@ maxfil:	ds	1			;highest file number allowed
 namcnt:	ds	1			;the number of character beyond #2 in a var name
 nambuf:	ds	namlen-2		;storage for chars beyond #2. used in ptrget
 namtmp:	ds	2			;temp storage during name save at indlop
-	public	dirtmp,filna2,filnam,filnm1,filnm9,filnm12
+	public	dirtmp,filna2,filnam,filnm1,filnm9,filn12
 dirtmp	set	cpmwrm+128		;use cpm default buffer in low memory
 filna2:	ds	16			;used by name code
 filnam:	ds	1			;5.21: split for filnam+N workaround
 filnm1:	ds	8			;5.21: filnam+1
 filnm9:	ds	3			;5.21: filnam+9
-filnm12: ds	21			;5.21: filnam+12
+filn12: ds	21			;5.21: filnam+12
 
 ;	cp/m 1.4 and 2.x support
 
@@ -1813,8 +1813,8 @@ arg:	ds	1			; precision]
 fbuffr:	ds	1			;buffer for fout
 fbufp1:	ds	26			;5.21: fbuffr+1
 fbufp27: ds	6			;5.21: fbuffr+27
-fbufp33: ds	1			;5.21: fbuffr+33
-fbufp34: ds	6			;5.21: fbuffr+34
+fbup33: ds	1			;5.21: fbuffr+33
+fbup34: ds	6			;5.21: fbuffr+34
 fmltt1:	ds	1			;5.21: fbuffr+40
 fmltt2:	ds	2			;5.21: fbuffr+41 (plus padding to 43)
 	page
